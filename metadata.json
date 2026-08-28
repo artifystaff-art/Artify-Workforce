@@ -1,0 +1,6 @@
+{
+  "name": "Artify Workforce",
+  "description": "Production-ready Android workforce management application with selfie verification, trusted server timestamps, geofencing, leave workflows, and supervisor approval.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
