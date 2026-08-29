@@ -40,6 +40,12 @@ data class WorkerUiState(
     val currentAccuracy: Float = 12.0f,
     val isMockLocation: Boolean = false,
     val currentGeofenceResult: ServerGeofenceResult? = null,
+    // Firestore Persistence & Sync State
+    val isNetworkOnline: Boolean = true,
+    val isSyncingFirestore: Boolean = false,
+    val queuedFirestoreCount: Int = 0,
+    val lastFirestoreSyncTime: Long? = null,
+    val firestoreSyncLogs: List<com.example.sync.SyncLogItem> = emptyList(),
     // Operations & UI Feedback
     val isProcessing: Boolean = false,
     val statusMessage: String? = null,
@@ -102,6 +108,52 @@ class WorkerViewModel(
                 _uiState.value = _uiState.value.copy(notifications = notifs)
             }
         }
+
+        // Observe Firestore Offline Persistence & Sync
+        val syncMgr = repository.firestoreSyncManager
+        if (syncMgr != null) {
+            viewModelScope.launch {
+                syncMgr.isOnline.collect { online ->
+                    _uiState.value = _uiState.value.copy(isNetworkOnline = online)
+                }
+            }
+            viewModelScope.launch {
+                syncMgr.isSyncing.collect { syncing ->
+                    _uiState.value = _uiState.value.copy(isSyncingFirestore = syncing)
+                }
+            }
+            viewModelScope.launch {
+                syncMgr.queuedCount.collect { count ->
+                    _uiState.value = _uiState.value.copy(queuedFirestoreCount = count)
+                }
+            }
+            viewModelScope.launch {
+                syncMgr.lastSyncTimestampUtc.collect { lastSync ->
+                    _uiState.value = _uiState.value.copy(lastFirestoreSyncTime = lastSync)
+                }
+            }
+            viewModelScope.launch {
+                syncMgr.syncLogs.collect { logs ->
+                    _uiState.value = _uiState.value.copy(firestoreSyncLogs = logs)
+                }
+            }
+        }
+    }
+
+    fun triggerManualSync() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(statusMessage = "Synchronizing offline queue with Firestore...")
+            val count = repository.syncPendingClockIns()
+            if (count > 0) {
+                _uiState.value = _uiState.value.copy(statusMessage = "Successfully synchronized $count clock-in record(s) with Firestore Cloud.")
+            } else {
+                _uiState.value = _uiState.value.copy(statusMessage = "All clock-in records are up to date.")
+            }
+        }
+    }
+
+    fun simulateNetwork(enableOnline: Boolean) {
+        repository.simulateFirestoreNetwork(enableOnline)
     }
 
     private fun startLiveShiftTimer() {
@@ -312,7 +364,47 @@ class WorkerViewModel(
     }
 
     fun setStartShiftDialog(show: Boolean) {
+        if (show) {
+            val geofence = _uiState.value.currentGeofenceResult
+            val project = _uiState.value.assignedProject
+            if (geofence != null && !geofence.isInside) {
+                val distance = geofence.distanceMeters.toInt()
+                val radius = project?.geofenceRadiusMeters?.toInt() ?: 100
+                val siteName = project?.projectName ?: "assigned work site"
+                _uiState.value = _uiState.value.copy(
+                    errorMessage = if (geofence.status == GeofenceStatus.MOCK_LOCATION_DETECTED) {
+                        "Clock-In Blocked: Mock/Spoofed GPS location detected. Please disable mock location apps."
+                    } else if (geofence.status == GeofenceStatus.GPS_UNAVAILABLE) {
+                        "Clock-In Blocked: GPS location unavailable. Please enable device location services."
+                    } else {
+                        "Clock-In Blocked: You are $distance m away from $siteName (Allowed radius: $radius m). You must be on-site to clock in."
+                    },
+                    showStartShiftDialog = false
+                )
+                return
+            }
+        }
         _uiState.value = _uiState.value.copy(showStartShiftDialog = show)
+    }
+
+    fun refreshLiveLocation(locationHelper: com.example.location.LocationHelper) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isProcessing = true, errorMessage = null)
+            val snapshot = locationHelper.getCurrentLocation()
+            if (snapshot != null) {
+                onDeviceLocationReceived(snapshot)
+                _uiState.value = _uiState.value.copy(
+                    isProcessing = false,
+                    testScenario = LocationTestScenario.LIVE_DEVICE_GPS,
+                    statusMessage = "Location updated via Google Location Services."
+                )
+            } else {
+                _uiState.value = _uiState.value.copy(
+                    isProcessing = false,
+                    errorMessage = "Unable to fetch current location. Ensure GPS and permissions are enabled."
+                )
+            }
+        }
     }
 
     fun setEndShiftDialog(show: Boolean) {

@@ -48,6 +48,7 @@ fun WorkerDashboardScreen(
     workerViewModel: WorkerViewModel,
     onLogoutClick: () -> Unit,
     repository: WorkforceRepository? = null,
+    locationHelper: com.example.location.LocationHelper? = null,
     modifier: Modifier = Modifier
 ) {
     val uiState by workerViewModel.uiState.collectAsState()
@@ -149,6 +150,7 @@ fun WorkerDashboardScreen(
             when (selectedBottomNav) {
                 0 -> ShiftDashboardTab(
                     workerViewModel = workerViewModel,
+                    locationHelper = locationHelper,
                     onOpenScenarioPicker = { showScenarioDropdown = true },
                     onNavigateToLogs = { selectedBottomNav = 1 }
                 )
@@ -247,6 +249,7 @@ fun WorkerDashboardScreen(
             CameraXSelfieDialog(
                 eventType = ShiftEventType.START_SHIFT,
                 projectName = uiState.assignedProject?.projectName ?: "Project Site",
+                employeeName = uiState.currentUser?.fullName,
                 onDismiss = { workerViewModel.setStartShiftDialog(false) },
                 onCaptureComplete = { selfiePath ->
                     workerViewModel.startShift(selfiePath)
@@ -305,17 +308,19 @@ fun WorkerDashboardScreen(
 @Composable
 private fun ShiftDashboardTab(
     workerViewModel: WorkerViewModel,
+    locationHelper: com.example.location.LocationHelper? = null,
     onOpenScenarioPicker: () -> Unit,
     onNavigateToLogs: () -> Unit
 ) {
     val uiState by workerViewModel.uiState.collectAsState()
     val isShiftActive = uiState.activeShift != null
+    val isInsideGeofence = uiState.currentGeofenceResult?.isInside == true
 
     // Infinite breathing pulse for the circular camera button ring
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 1.0f,
-        targetValue = if (isShiftActive) 1.06f else 1.03f,
+        targetValue = if (isShiftActive) 1.06f else if (isInsideGeofence) 1.03f else 1.01f,
         animationSpec = infiniteRepeatable(
             animation = tween(durationMillis = 1500, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
@@ -330,13 +335,62 @@ private fun ShiftDashboardTab(
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // --- GEOFENCE RESTRICTION WARNING BANNER (When Outside Work Site) ---
+        if (!isShiftActive && !isInsideGeofence) {
+            val currentDist = uiState.currentGeofenceResult?.distanceMeters?.toInt() ?: -1
+            val maxRadius = uiState.assignedProject?.geofenceRadiusMeters?.toInt() ?: 100
+            val siteName = uiState.assignedProject?.projectName ?: "Assigned Work Site"
+
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = SophisticatedErrorContainer,
+                border = BorderStroke(1.dp, SophisticatedError.copy(alpha = 0.5f)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp)
+                    .testTag("geofence_restriction_banner")
+            ) {
+                Row(
+                    modifier = Modifier.padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.LocationOff,
+                        contentDescription = "Geofence Blocked",
+                        tint = SophisticatedError,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Clock-In Restricted (Outside Site Radius)",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            color = SophisticatedError
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = if (uiState.isMockLocation) {
+                                "Mock GPS detected. Spoofed locations are prohibited."
+                            } else {
+                                "Current distance: ${currentDist}m from $siteName (Allowed radius: ${maxRadius}m). Submissions are blocked until on-site."
+                            },
+                            fontSize = 11.sp,
+                            color = SophisticatedTextPrimary,
+                            lineHeight = 15.sp
+                        )
+                    }
+                }
+            }
+        }
 
         // --- ROUND BIG CAMERA SHIFT BUTTON IN A CIRCLE ---
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
-                .padding(vertical = 12.dp)
+                .padding(vertical = 10.dp)
                 .testTag("shift_action_card")
         ) {
             // Outer glowing accent ring with subtle pulse animation
@@ -350,6 +404,13 @@ private fun ShiftDashboardTab(
                             Brush.radialGradient(
                                 colors = listOf(
                                     SophisticatedError.copy(alpha = 0.25f),
+                                    Color.Transparent
+                                )
+                            )
+                        } else if (!isInsideGeofence) {
+                            Brush.radialGradient(
+                                colors = listOf(
+                                    SophisticatedError.copy(alpha = 0.2f),
                                     Color.Transparent
                                 )
                             )
@@ -378,6 +439,13 @@ private fun ShiftDashboardTab(
                                     SophisticatedError.copy(alpha = 0.3f)
                                 )
                             )
+                        } else if (!isInsideGeofence) {
+                            Brush.linearGradient(
+                                listOf(
+                                    SophisticatedError.copy(alpha = 0.6f),
+                                    SophisticatedError.copy(alpha = 0.2f)
+                                )
+                            )
                         } else {
                             Brush.linearGradient(
                                 listOf(
@@ -402,9 +470,11 @@ private fun ShiftDashboardTab(
                 enabled = !uiState.isProcessing,
                 shape = CircleShape,
                 color = SophisticatedDarkSurface,
-                border = androidx.compose.foundation.BorderStroke(
+                border = BorderStroke(
                     1.dp,
-                    if (isShiftActive) SophisticatedError.copy(alpha = 0.6f) else SophisticatedDarkBorderLight
+                    if (isShiftActive) SophisticatedError.copy(alpha = 0.6f)
+                    else if (!isInsideGeofence) SophisticatedError.copy(alpha = 0.5f)
+                    else SophisticatedDarkBorderLight
                 ),
                 modifier = Modifier
                     .size(196.dp)
@@ -424,18 +494,24 @@ private fun ShiftDashboardTab(
                             .size(56.dp)
                             .clip(CircleShape)
                             .background(
-                                if (isShiftActive) SophisticatedErrorContainer else SophisticatedPrimaryContainer
+                                if (isShiftActive) SophisticatedErrorContainer
+                                else if (!isInsideGeofence) SophisticatedErrorContainer
+                                else SophisticatedPrimaryContainer
                             )
                             .border(
                                 width = 1.dp,
-                                color = if (isShiftActive) SophisticatedError.copy(alpha = 0.5f) else SophisticatedPrimary.copy(alpha = 0.5f),
+                                color = if (isShiftActive) SophisticatedError.copy(alpha = 0.5f)
+                                else if (!isInsideGeofence) SophisticatedError.copy(alpha = 0.5f)
+                                else SophisticatedPrimary.copy(alpha = 0.5f),
                                 shape = CircleShape
                             )
                     ) {
                         Icon(
-                            imageVector = if (isShiftActive) Icons.Default.Logout else Icons.Default.CameraAlt,
+                            imageVector = if (isShiftActive) Icons.Default.Logout
+                            else if (!isInsideGeofence) Icons.Default.LocationOff
+                            else Icons.Default.CameraAlt,
                             contentDescription = if (isShiftActive) "End Shift / Clock Out" else "Start Shift with Selfie",
-                            tint = if (isShiftActive) SophisticatedError else SophisticatedPrimary,
+                            tint = if (isShiftActive || !isInsideGeofence) SophisticatedError else SophisticatedPrimary,
                             modifier = Modifier.size(28.dp)
                         )
                     }
@@ -444,7 +520,9 @@ private fun ShiftDashboardTab(
 
                     // Action Title Text
                     Text(
-                        text = if (isShiftActive) "End Shift / Clock Out" else "Start Shift with Selfie",
+                        text = if (isShiftActive) "End Shift / Clock Out"
+                        else if (!isInsideGeofence) "Clock In Restricted"
+                        else "Start Shift with Selfie",
                         color = SophisticatedTextPrimary,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
@@ -456,8 +534,10 @@ private fun ShiftDashboardTab(
 
                     // Secondary helper text
                     Text(
-                        text = if (isShiftActive) "Tap to Clock Out (Instant)" else "Tap to Clock In",
-                        color = if (isShiftActive) SophisticatedError else SophisticatedSuccess,
+                        text = if (isShiftActive) "Tap to Clock Out (Instant)"
+                        else if (!isInsideGeofence) "Blocked • Outside Radius"
+                        else "Tap to Clock In",
+                        color = if (isShiftActive || !isInsideGeofence) SophisticatedError else SophisticatedSuccess,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.SemiBold,
                         textAlign = TextAlign.Center
@@ -466,7 +546,131 @@ private fun ShiftDashboardTab(
             }
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // --- GEOFENCE STATUS & GOOGLE LOCATION SERVICES CARD ---
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("geofence_status_card"),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = SophisticatedDarkSurface
+            ),
+            border = BorderStroke(
+                1.dp,
+                if (isInsideGeofence) SophisticatedSuccess.copy(alpha = 0.4f) else SophisticatedError.copy(alpha = 0.4f)
+            )
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = if (isInsideGeofence) Icons.Default.GpsFixed else Icons.Default.GpsOff,
+                            contentDescription = "Geofence Check",
+                            tint = if (isInsideGeofence) SophisticatedSuccess else SophisticatedError,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Geofence Verification",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            color = SophisticatedTextPrimary
+                        )
+                    }
+
+                    // Status Pill
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = if (isInsideGeofence) SophisticatedSuccessContainer else SophisticatedErrorContainer,
+                        border = BorderStroke(
+                            1.dp,
+                            if (isInsideGeofence) SophisticatedSuccess.copy(alpha = 0.6f) else SophisticatedError.copy(alpha = 0.6f)
+                        )
+                    ) {
+                        Text(
+                            text = if (isInsideGeofence) "ON-SITE • ALLOWED" else "OUTSIDE • BLOCKED",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isInsideGeofence) SophisticatedSuccess else SophisticatedError,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                val currentDist = uiState.currentGeofenceResult?.distanceMeters?.toInt() ?: -1
+                val maxRadius = uiState.assignedProject?.geofenceRadiusMeters?.toInt() ?: 100
+                val siteName = uiState.assignedProject?.projectName ?: "Assigned Work Site"
+
+                Text(
+                    text = if (isInsideGeofence) {
+                        "✓ Verified within work site radius ($currentDist m from $siteName center, limit: $maxRadius m). Clock-ins permitted."
+                    } else if (uiState.isMockLocation) {
+                        "⚠️ Spoofed/Mock GPS coordinates detected. Submissions are strictly prohibited."
+                    } else {
+                        "⚠️ Outside work site perimeter ($currentDist m away, limit: $maxRadius m). Clock-ins are blocked until within the site boundary."
+                    },
+                    fontSize = 11.sp,
+                    color = if (isInsideGeofence) SophisticatedTextSecondary else SophisticatedError,
+                    lineHeight = 15.sp
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Action row for Location Services refresh and test picker
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (locationHelper != null) {
+                        OutlinedButton(
+                            onClick = { workerViewModel.refreshLiveLocation(locationHelper) },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(36.dp)
+                                .testTag("refresh_gps_btn"),
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(1.dp, SophisticatedPrimary.copy(alpha = 0.5f)),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                containerColor = SophisticatedDarkBg,
+                                contentColor = SophisticatedPrimary
+                            )
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Refresh GPS", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    OutlinedButton(
+                        onClick = onOpenScenarioPicker,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(36.dp)
+                            .testTag("test_scenario_btn"),
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.dp, SophisticatedDarkBorderLight),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = SophisticatedDarkBg,
+                            contentColor = SophisticatedTextSecondary
+                        )
+                    ) {
+                        Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Test GPS Mode", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
 
         // --- CLOCK COUNTER OF SHIFT ---
         Card(
@@ -587,6 +791,19 @@ private fun ShiftDashboardTab(
 
         Spacer(modifier = Modifier.height(14.dp))
 
+        // --- FIRESTORE OFFLINE PERSISTENCE & AUTO-SYNC CARD ---
+        FirestoreOfflinePersistenceCard(
+            isOnline = uiState.isNetworkOnline,
+            isSyncing = uiState.isSyncingFirestore,
+            queuedCount = uiState.queuedFirestoreCount,
+            lastSyncTimestamp = uiState.lastFirestoreSyncTime,
+            syncLogs = uiState.firestoreSyncLogs,
+            onManualSync = { workerViewModel.triggerManualSync() },
+            onToggleNetwork = { workerViewModel.simulateNetwork(!uiState.isNetworkOnline) }
+        )
+
+        Spacer(modifier = Modifier.height(14.dp))
+
         // Direct shortcut button to Daily Attendance Logs
         OutlinedButton(
             onClick = onNavigateToLogs,
@@ -615,6 +832,303 @@ private fun ShiftDashboardTab(
         }
 
         Spacer(modifier = Modifier.height(30.dp))
+    }
+}
+
+@Composable
+private fun FirestoreOfflinePersistenceCard(
+    isOnline: Boolean,
+    isSyncing: Boolean,
+    queuedCount: Int,
+    lastSyncTimestamp: Long?,
+    syncLogs: List<com.example.sync.SyncLogItem>,
+    onManualSync: () -> Unit,
+    onToggleNetwork: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var showLogHistory by remember { mutableStateOf(false) }
+
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("firestore_sync_card"),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = SophisticatedDarkSurface
+        ),
+        border = BorderStroke(
+            1.dp,
+            if (!isOnline) SophisticatedWarning.copy(alpha = 0.5f)
+            else if (queuedCount > 0) SophisticatedPrimary.copy(alpha = 0.5f)
+            else SophisticatedSuccess.copy(alpha = 0.4f)
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            // Header Row: Cloud Status & Mode Badge
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = if (!isOnline) Icons.Default.CloudOff
+                        else if (isSyncing) Icons.Default.Sync
+                        else if (queuedCount > 0) Icons.Default.CloudQueue
+                        else Icons.Default.CloudDone,
+                        contentDescription = "Firestore Sync Status",
+                        tint = if (!isOnline) SophisticatedWarning
+                        else if (isSyncing) SophisticatedPrimary
+                        else if (queuedCount > 0) SophisticatedPrimary
+                        else SophisticatedSuccess,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            text = "Firestore Cloud Persistence",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            color = SophisticatedTextPrimary
+                        )
+                        Text(
+                            text = "Unlimited Disk Cache • Dual-Write Sync",
+                            fontSize = 10.sp,
+                            color = SophisticatedTextMuted
+                        )
+                    }
+                }
+
+                // Connection State Pill
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = if (isOnline) SophisticatedSuccessContainer else SophisticatedWarningContainer,
+                    border = BorderStroke(
+                        1.dp,
+                        if (isOnline) SophisticatedSuccess.copy(alpha = 0.6f) else SophisticatedWarning.copy(alpha = 0.6f)
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(if (isOnline) SophisticatedSuccess else SophisticatedWarning)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = if (isOnline) "ONLINE" else "OFFLINE",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isOnline) SophisticatedSuccess else SophisticatedWarning
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Information & Queue Status Banner
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = if (!isOnline || queuedCount > 0) SophisticatedDarkBg else SophisticatedDarkBg.copy(alpha = 0.6f),
+                border = BorderStroke(1.dp, SophisticatedDarkBorder),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Offline Queue Buffer:",
+                            fontSize = 11.sp,
+                            color = SophisticatedTextSecondary,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = if (queuedCount == 0) "0 Pending (Synced)" else "$queuedCount Clock-In(s) Queued",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (queuedCount > 0) SophisticatedWarning else SophisticatedSuccess
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Text(
+                        text = if (!isOnline) {
+                            "Device is offline. All clock-in attempts are saved to Firestore's persistent disk cache and local Room DB. They will automatically sync to cloud upon network reconnection."
+                        } else if (queuedCount > 0) {
+                            "Restoring connection: $queuedCount clock-in record(s) queued for synchronization with Firestore Cloud backend."
+                        } else {
+                            "All attendance clock-ins are synchronized with the Firestore Cloud cluster. Persistent caching ensures zero data loss during field network drops."
+                        },
+                        fontSize = 11.sp,
+                        color = SophisticatedTextSecondary,
+                        lineHeight = 15.sp
+                    )
+
+                    if (lastSyncTimestamp != null && lastSyncTimestamp > 0) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        val formattedTime = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
+                            .format(java.util.Date(lastSyncTimestamp))
+                        Text(
+                            text = "Last Cloud Sync: $formattedTime UTC",
+                            fontSize = 10.sp,
+                            color = SophisticatedTextMuted
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Action Buttons: Manual Sync & Toggle Network Simulation
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Sync Now button
+                Button(
+                    onClick = onManualSync,
+                    enabled = isOnline && !isSyncing,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(36.dp)
+                        .testTag("firestore_manual_sync_btn"),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = SophisticatedPrimary,
+                        contentColor = SophisticatedDarkBg,
+                        disabledContainerColor = SophisticatedPrimary.copy(alpha = 0.3f),
+                        disabledContentColor = SophisticatedTextMuted
+                    )
+                ) {
+                    if (isSyncing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(14.dp),
+                            strokeWidth = 2.dp,
+                            color = SophisticatedDarkBg
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Syncing...", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    } else {
+                        Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Sync Now", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                // Simulate Network Toggle Button (to test offline persistence)
+                OutlinedButton(
+                    onClick = onToggleNetwork,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(36.dp)
+                        .testTag("simulate_network_toggle_btn"),
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(
+                        1.dp,
+                        if (isOnline) SophisticatedWarning.copy(alpha = 0.6f) else SophisticatedSuccess.copy(alpha = 0.6f)
+                    ),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = SophisticatedDarkBg,
+                        contentColor = if (isOnline) SophisticatedWarning else SophisticatedSuccess
+                    )
+                ) {
+                    Icon(
+                        imageVector = if (isOnline) Icons.Default.WifiOff else Icons.Default.Wifi,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = if (isOnline) "Simulate Offline" else "Restore Online",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+
+            // Expandable Sync Logs History
+            if (syncLogs.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showLogHistory = !showLogHistory }
+                        .padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Sync Activity History (${syncLogs.size})",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = SophisticatedPrimary
+                    )
+                    Icon(
+                        imageVector = if (showLogHistory) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                        contentDescription = null,
+                        tint = SophisticatedPrimary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+
+                AnimatedVisibility(visible = showLogHistory) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 6.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        syncLogs.take(4).forEach { log ->
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = SophisticatedDarkBg,
+                                border = BorderStroke(1.dp, SophisticatedDarkBorderLight),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = log.message,
+                                            fontSize = 10.sp,
+                                            color = SophisticatedTextPrimary,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                        Text(
+                                            text = log.formattedTime,
+                                            fontSize = 9.sp,
+                                            color = SophisticatedTextMuted
+                                        )
+                                    }
+                                    Text(
+                                        text = log.status.name,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = when (log.status) {
+                                            com.example.sync.SyncStatus.SYNCED -> SophisticatedSuccess
+                                            com.example.sync.SyncStatus.PENDING -> SophisticatedWarning
+                                            com.example.sync.SyncStatus.FAILED -> SophisticatedError
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -1226,6 +1740,56 @@ private fun WorkerProfileTab(
                 )
 
                 Spacer(modifier = Modifier.height(14.dp))
+
+                // 3-Way Mode Segmented Selector (System, Light, Dark)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+                        .padding(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    ThemeMode.values().forEach { mode ->
+                        val isSelected = themeMode == mode
+                        Surface(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable { themePrefs?.setThemeMode(mode) }
+                                .testTag("theme_mode_chip_${mode.name.lowercase()}"),
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                            tonalElevation = if (isSelected) 2.dp else 0.dp
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(vertical = 8.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = when (mode) {
+                                        ThemeMode.SYSTEM -> Icons.Default.BrightnessAuto
+                                        ThemeMode.LIGHT -> Icons.Default.LightMode
+                                        ThemeMode.DARK -> Icons.Default.DarkMode
+                                    },
+                                    contentDescription = null,
+                                    tint = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = mode.shortName,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
 
                 // Persistent Dark Mode Switch Row
                 Surface(

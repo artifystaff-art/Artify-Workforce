@@ -105,21 +105,21 @@ fun ArtifyTopHeader(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    // Theme Quick Mode Button
+                    // Theme Quick Mode Toggle Button
                     IconButton(
                         onClick = {
                             if (onThemeClick != null) {
                                 onThemeClick()
                             } else if (themePrefs != null) {
-                                showThemeDialog = true
+                                themePrefs.toggleTheme(isDark)
                             }
                         },
                         modifier = Modifier.testTag("header_theme_toggle_btn")
                     ) {
                         Icon(
                             imageVector = if (isDark) Icons.Outlined.LightMode else Icons.Outlined.DarkMode,
-                            contentDescription = "Toggle Theme Mode",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            contentDescription = if (isDark) "Switch to Light Mode" else "Switch to Dark Mode",
+                            tint = MaterialTheme.colorScheme.primary
                         )
                     }
 

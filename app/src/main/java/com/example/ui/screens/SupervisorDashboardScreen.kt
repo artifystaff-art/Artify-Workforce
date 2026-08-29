@@ -1,6 +1,7 @@
 package com.example.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -201,7 +202,14 @@ fun SupervisorDashboardScreen(
                         )
                         4 -> AuditAndErpView(
                             auditLogs = uiState.auditLogs,
-                            erpEvents = uiState.erpOutboxEvents
+                            erpEvents = uiState.erpOutboxEvents,
+                            isOnline = uiState.isNetworkOnline,
+                            isSyncing = uiState.isSyncingFirestore,
+                            queuedCount = uiState.queuedFirestoreCount,
+                            lastSyncTimestamp = uiState.lastFirestoreSyncTime,
+                            syncLogs = uiState.firestoreSyncLogs,
+                            onManualSync = { supervisorViewModel.triggerManualSync() },
+                            onToggleNetwork = { supervisorViewModel.simulateNetwork(!uiState.isNetworkOnline) }
                         )
                     }
                 }
@@ -840,7 +848,14 @@ private fun SitesHeadcountView(
 @Composable
 private fun AuditAndErpView(
     auditLogs: List<AuditLogEntity>,
-    erpEvents: List<com.example.data.entity.ErpOutboxEntity>
+    erpEvents: List<com.example.data.entity.ErpOutboxEntity>,
+    isOnline: Boolean = true,
+    isSyncing: Boolean = false,
+    queuedCount: Int = 0,
+    lastSyncTimestamp: Long? = null,
+    syncLogs: List<com.example.sync.SyncLogItem> = emptyList(),
+    onManualSync: () -> Unit = {},
+    onToggleNetwork: () -> Unit = {}
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
 
@@ -873,7 +888,7 @@ private fun AuditAndErpView(
                     Text(
                         "Audit Trail (${auditLogs.size})",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                         color = if (selectedTab == 0) SophisticatedPrimary else SophisticatedTextSecondary
                     )
                 }
@@ -885,8 +900,20 @@ private fun AuditAndErpView(
                     Text(
                         "ERP Outbox (${erpEvents.size})",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                         color = if (selectedTab == 1) SophisticatedPrimary else SophisticatedTextSecondary
+                    )
+                }
+            )
+            Tab(
+                selected = selectedTab == 2,
+                onClick = { selectedTab = 2 },
+                text = {
+                    Text(
+                        "Cloud Sync (${queuedCount})",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp,
+                        color = if (selectedTab == 2) SophisticatedPrimary else if (queuedCount > 0) SophisticatedWarning else SophisticatedTextSecondary
                     )
                 }
             )
@@ -932,7 +959,7 @@ private fun AuditAndErpView(
                     }
                 }
             }
-        } else {
+        } else if (selectedTab == 1) {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(erpEvents) { event ->
                     Card(
@@ -969,6 +996,159 @@ private fun AuditAndErpView(
                             Text(text = "Idempotency Key: ${event.idempotencyKey}", color = SophisticatedTextPrimary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                             Text(text = "Payload: ${event.payloadJson}", color = SophisticatedTextSecondary, fontSize = 11.sp)
                             Text(text = "ERP Ref: ${event.erpResponseRef ?: "PENDING"}", color = SophisticatedPrimary, fontSize = 11.sp)
+                        }
+                    }
+                }
+            }
+        } else {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = SophisticatedDarkSurface),
+                        border = BorderStroke(1.dp, if (!isOnline) SophisticatedWarning.copy(alpha = 0.5f) else SophisticatedSuccess.copy(alpha = 0.4f))
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = if (!isOnline) Icons.Default.CloudOff else if (isSyncing) Icons.Default.Sync else Icons.Default.CloudDone,
+                                        contentDescription = null,
+                                        tint = if (!isOnline) SophisticatedWarning else if (isSyncing) SophisticatedPrimary else SophisticatedSuccess,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Firestore Cloud Persistence", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = SophisticatedTextPrimary)
+                                }
+
+                                Surface(
+                                    shape = RoundedCornerShape(50),
+                                    color = if (isOnline) SophisticatedSuccessContainer else SophisticatedWarningContainer
+                                ) {
+                                    Text(
+                                        text = if (isOnline) "ONLINE" else "OFFLINE",
+                                        color = if (isOnline) SophisticatedSuccess else SophisticatedWarning,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 10.sp,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Persistent disk cache with automatic reconnection reconciliation. Clock-ins queued offline automatically sync to the server when connection is re-established.",
+                                fontSize = 11.sp,
+                                color = SophisticatedTextSecondary,
+                                lineHeight = 15.sp
+                            )
+
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Queued Local Clock-Ins:", fontSize = 11.sp, color = SophisticatedTextMuted)
+                                Text(
+                                    text = if (queuedCount == 0) "0 (All Synced)" else "$queuedCount Pending",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (queuedCount > 0) SophisticatedWarning else SophisticatedSuccess
+                                )
+                            }
+
+                            if (lastSyncTimestamp != null && lastSyncTimestamp > 0) {
+                                val timeStr = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US).format(java.util.Date(lastSyncTimestamp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text("Last Sync Completed:", fontSize = 11.sp, color = SophisticatedTextMuted)
+                                    Text(timeStr + " UTC", fontSize = 10.sp, color = SophisticatedTextPrimary)
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(
+                                    onClick = onManualSync,
+                                    enabled = isOnline && !isSyncing,
+                                    modifier = Modifier.weight(1f).height(36.dp),
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = SophisticatedPrimary, contentColor = SophisticatedDarkBg)
+                                ) {
+                                    if (isSyncing) {
+                                        CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp, color = SophisticatedDarkBg)
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Syncing...", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    } else {
+                                        Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(14.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Sync Now", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+
+                                OutlinedButton(
+                                    onClick = onToggleNetwork,
+                                    modifier = Modifier.weight(1f).height(36.dp),
+                                    shape = RoundedCornerShape(10.dp),
+                                    border = BorderStroke(1.dp, if (isOnline) SophisticatedWarning.copy(alpha = 0.6f) else SophisticatedSuccess.copy(alpha = 0.6f)),
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = if (isOnline) SophisticatedWarning else SophisticatedSuccess)
+                                ) {
+                                    Icon(
+                                        imageVector = if (isOnline) Icons.Default.WifiOff else Icons.Default.Wifi,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(if (isOnline) "Simulate Offline" else "Restore Online", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    Text("Sync Telemetry Activity Log", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = SophisticatedTextPrimary)
+                }
+
+                if (syncLogs.isEmpty()) {
+                    item {
+                        Text("No sync events recorded yet.", fontSize = 11.sp, color = SophisticatedTextMuted)
+                    }
+                } else {
+                    items(syncLogs) { log ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = SophisticatedDarkSurface),
+                            border = BorderStroke(1.dp, SophisticatedDarkBorder)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(text = log.message, fontSize = 11.sp, color = SophisticatedTextPrimary, fontWeight = FontWeight.Medium)
+                                    Text(text = "${log.formattedTime} UTC", fontSize = 9.sp, color = SophisticatedTextMuted)
+                                }
+                                Text(
+                                    text = log.status.name,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = when (log.status) {
+                                        com.example.sync.SyncStatus.SYNCED -> SophisticatedSuccess
+                                        com.example.sync.SyncStatus.PENDING -> SophisticatedWarning
+                                        com.example.sync.SyncStatus.FAILED -> SophisticatedError
+                                    }
+                                )
+                            }
                         }
                     }
                 }

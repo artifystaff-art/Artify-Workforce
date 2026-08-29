@@ -75,6 +75,21 @@ interface AttendanceDao {
     @Update
     suspend fun updateAttendance(attendance: AttendanceEntity)
 
+    @Query("SELECT * FROM attendance WHERE syncedToFirestore = 0 ORDER BY createdAtUtc ASC")
+    suspend fun getUnsyncedAttendance(): List<AttendanceEntity>
+
+    @Query("SELECT * FROM attendance WHERE syncedToFirestore = 0 ORDER BY createdAtUtc ASC")
+    fun getUnsyncedAttendanceFlow(): Flow<List<AttendanceEntity>>
+
+    @Query("SELECT COUNT(*) FROM attendance WHERE syncedToFirestore = 0")
+    fun getUnsyncedAttendanceCount(): Flow<Int>
+
+    @Query("UPDATE attendance SET syncedToFirestore = 1, firestoreSyncStatus = 'SYNCED', firestoreSyncedAtUtc = :syncedAtUtc WHERE attendanceId = :id")
+    suspend fun markAttendanceSyncedToFirestore(id: String, syncedAtUtc: Long)
+
+    @Query("UPDATE attendance SET firestoreSyncStatus = :status WHERE attendanceId = :id")
+    suspend fun updateFirestoreSyncStatus(id: String, status: String)
+
     @Query("SELECT COUNT(*) FROM attendance")
     suspend fun getAttendanceCount(): Int
 }

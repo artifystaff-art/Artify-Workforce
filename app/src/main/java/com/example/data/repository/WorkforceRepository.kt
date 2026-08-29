@@ -1,14 +1,24 @@
 package com.example.data.repository
 
+import android.content.Context
 import com.example.data.AppDatabase
 import com.example.data.entity.*
 import com.example.model.*
+import com.example.notifications.FcmNotificationManager
 import com.example.server.LocationUtils
 import com.example.server.ServerAuthorityEngine
+import com.example.sync.FirestoreSyncManager
 import kotlinx.coroutines.flow.Flow
 import java.util.UUID
 
-class WorkforceRepository(private val db: AppDatabase) {
+class WorkforceRepository(
+    private val db: AppDatabase,
+    private val context: Context? = null
+) {
+
+    val firestoreSyncManager: FirestoreSyncManager? = context?.let {
+        FirestoreSyncManager.getInstance(it, db)
+    }
 
     private val userDao = db.userDao()
     private val projectDao = db.projectDao()
@@ -458,7 +468,7 @@ class WorkforceRepository(private val db: AppDatabase) {
             return Result.failure(Exception("Active shift already in progress since ${existingActive.startTimeFormatted}. Must end active shift first."))
         }
 
-        // 2. Validate Geofence on Authoritative Server Engine (for Head Office Payroll telemetry & reporting)
+        // 2. Authoritative Geofence Validation (Google Location Services & Server Engine)
         val geofenceResult = ServerAuthorityEngine.evaluateGeofence(
             latitude = latitude,
             longitude = longitude,
@@ -467,8 +477,28 @@ class WorkforceRepository(private val db: AppDatabase) {
             project = project
         )
 
-        // GPS and Geofencing are strictly used to telemetry-sync and notify the Head Office Payroll system.
-        // The mobile app never restricts or blocks the worker from marking attendance.
+        // Strict Geofence Check: Restrict clock-ins and block submissions from outside the designated work site radius
+        if (latitude == null || longitude == null) {
+            return Result.failure(
+                IllegalStateException("Clock-In Blocked: Location services are required. Please enable GPS to verify you are on site at ${project.projectName}.")
+            )
+        }
+
+        if (isMockLocation) {
+            return Result.failure(
+                IllegalStateException("Clock-In Blocked: Mock/Spoofed location detected. Clock-in is prohibited using simulated coordinates.")
+            )
+        }
+
+        if (!geofenceResult.isInside || geofenceResult.status == GeofenceStatus.OUTSIDE_GEOFENCE) {
+            val dist = geofenceResult.distanceMeters.toInt()
+            val radius = project.geofenceRadiusMeters.toInt()
+            val excess = (geofenceResult.distanceMeters - project.geofenceRadiusMeters).toInt()
+            return Result.failure(
+                IllegalStateException("Clock-In Blocked: You are outside the designated work site perimeter. You are currently ${dist}m away from ${project.projectName} (${excess}m outside allowed ${radius}m radius).")
+            )
+        }
+
         val verificationStatus = if (geofenceResult.isInside && geofenceResult.isAccuracyAcceptable) {
             VerificationStatus.VERIFIED
         } else {
@@ -507,6 +537,9 @@ class WorkforceRepository(private val db: AppDatabase) {
         )
 
         attendanceDao.insertAttendance(attendance)
+
+        // Queue clock-in attempt into Firestore persistent cache (queues offline, auto-syncs when online)
+        firestoreSyncManager?.queueClockIn(attendance)
 
         // Audit Trail (Synchronized with Head Office Payroll)
         auditDao.insertAuditLog(
@@ -578,6 +611,9 @@ class WorkforceRepository(private val db: AppDatabase) {
         )
 
         attendanceDao.updateAttendance(updatedShift)
+
+        // Queue shift update to Firestore persistent cache
+        firestoreSyncManager?.queueClockIn(updatedShift)
 
         // Audit Trail (Synchronized with Head Office Payroll)
         auditDao.insertAuditLog(
@@ -844,7 +880,7 @@ class WorkforceRepository(private val db: AppDatabase) {
             )
         )
 
-        // Notify Employee
+        // Notify Employee (Local In-App Notification)
         notificationDao.insertNotification(
             NotificationEntity(
                 notificationId = "NOTIF-LV-OK-" + UUID.randomUUID().toString().take(8),
@@ -855,6 +891,16 @@ class WorkforceRepository(private val db: AppDatabase) {
                 timestampUtc = serverTime.timestampUtc
             )
         )
+
+        // Dispatch Automated FCM Push Notification
+        context?.let { ctx ->
+            FcmNotificationManager.dispatchLeaveStatusPushNotification(
+                context = ctx,
+                leave = updated,
+                supervisor = supervisor,
+                isApproved = true
+            )
+        }
 
         return Result.success(updated)
     }
@@ -900,7 +946,7 @@ class WorkforceRepository(private val db: AppDatabase) {
             )
         )
 
-        // Notify Employee
+        // Notify Employee (Local In-App Notification)
         notificationDao.insertNotification(
             NotificationEntity(
                 notificationId = "NOTIF-LV-NO-" + UUID.randomUUID().toString().take(8),
@@ -911,6 +957,17 @@ class WorkforceRepository(private val db: AppDatabase) {
                 timestampUtc = serverTime.timestampUtc
             )
         )
+
+        // Dispatch Automated FCM Push Notification
+        context?.let { ctx ->
+            FcmNotificationManager.dispatchLeaveStatusPushNotification(
+                context = ctx,
+                leave = updated,
+                supervisor = supervisor,
+                isApproved = false,
+                reason = rejectionReason
+            )
+        }
 
         return Result.success(updated)
     }
@@ -935,4 +992,16 @@ class WorkforceRepository(private val db: AppDatabase) {
     fun getAllErpOutbox(): Flow<List<ErpOutboxEntity>> = erpDao.getAllOutboxEvents()
 
     suspend fun markNotificationAsRead(id: String) = notificationDao.markAsRead(id)
+
+    // --- Firestore Offline Persistence & Sync Helpers ---
+
+    fun getUnsyncedAttendanceCount(): Flow<Int> = attendanceDao.getUnsyncedAttendanceCount()
+
+    suspend fun syncPendingClockIns(): Int {
+        return firestoreSyncManager?.syncPendingClockIns() ?: 0
+    }
+
+    fun simulateFirestoreNetwork(enableOnline: Boolean) {
+        firestoreSyncManager?.simulateNetwork(enableOnline)
+    }
 }

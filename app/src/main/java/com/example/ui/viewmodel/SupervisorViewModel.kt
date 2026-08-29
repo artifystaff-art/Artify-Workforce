@@ -31,6 +31,12 @@ data class SupervisorUiState(
     val allLeaveRequests: List<LeaveRequestEntity> = emptyList(),
     val auditLogs: List<AuditLogEntity> = emptyList(),
     val erpOutboxEvents: List<ErpOutboxEntity> = emptyList(),
+    // Firestore Persistence & Sync State
+    val isNetworkOnline: Boolean = true,
+    val isSyncingFirestore: Boolean = false,
+    val queuedFirestoreCount: Int = 0,
+    val lastFirestoreSyncTime: Long? = null,
+    val firestoreSyncLogs: List<com.example.sync.SyncLogItem> = emptyList(),
     // Selected record for deep inspection / review modal
     val selectedAttendance: AttendanceEntity? = null,
     val selectedLeave: LeaveRequestEntity? = null,
@@ -113,6 +119,52 @@ class SupervisorViewModel(
                 _uiState.value = _uiState.value.copy(erpOutboxEvents = events)
             }
         }
+
+        // Observe Firestore Offline Persistence & Sync
+        val syncMgr = repository.firestoreSyncManager
+        if (syncMgr != null) {
+            viewModelScope.launch {
+                syncMgr.isOnline.collect { online ->
+                    _uiState.value = _uiState.value.copy(isNetworkOnline = online)
+                }
+            }
+            viewModelScope.launch {
+                syncMgr.isSyncing.collect { syncing ->
+                    _uiState.value = _uiState.value.copy(isSyncingFirestore = syncing)
+                }
+            }
+            viewModelScope.launch {
+                syncMgr.queuedCount.collect { count ->
+                    _uiState.value = _uiState.value.copy(queuedFirestoreCount = count)
+                }
+            }
+            viewModelScope.launch {
+                syncMgr.lastSyncTimestampUtc.collect { lastSync ->
+                    _uiState.value = _uiState.value.copy(lastFirestoreSyncTime = lastSync)
+                }
+            }
+            viewModelScope.launch {
+                syncMgr.syncLogs.collect { logs ->
+                    _uiState.value = _uiState.value.copy(firestoreSyncLogs = logs)
+                }
+            }
+        }
+    }
+
+    fun triggerManualSync() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(statusMessage = "Synchronizing offline queue with Firestore...")
+            val count = repository.syncPendingClockIns()
+            if (count > 0) {
+                _uiState.value = _uiState.value.copy(statusMessage = "Successfully synchronized $count clock-in record(s) with Firestore Cloud.")
+            } else {
+                _uiState.value = _uiState.value.copy(statusMessage = "All attendance records are synchronized.")
+            }
+        }
+    }
+
+    fun simulateNetwork(enableOnline: Boolean) {
+        repository.simulateFirestoreNetwork(enableOnline)
     }
 
     fun selectAttendanceForReview(attendance: AttendanceEntity?) {

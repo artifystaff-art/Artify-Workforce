@@ -32,7 +32,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -41,7 +40,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -61,16 +59,23 @@ import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.Executors
 
+/**
+ * High-performance, biometric-guided CameraX selfie capture component for employee identity verification
+ * prior to clocking in or out.
+ */
 @Composable
-fun CameraXSelfieDialog(
-    eventType: ShiftEventType,
-    projectName: String,
-    onDismiss: () -> Unit,
+fun CameraXSelfieCaptureView(
+    eventType: ShiftEventType = ShiftEventType.START_SHIFT,
+    projectName: String = "Site Operations",
+    employeeName: String? = null,
+    modifier: Modifier = Modifier,
+    onDismiss: () -> Unit = {},
     onCaptureComplete: (selfieFilePath: String) -> Unit
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val coroutineScope = rememberCoroutineScope()
+    val isDark = LocalIsDarkTheme.current
 
     var hasCameraPermission by remember {
         mutableStateOf(
@@ -114,7 +119,7 @@ fun CameraXSelfieDialog(
         }
     }
 
-    // Bind CameraX Lifecycle
+    // Bind CameraX Lifecycle to PreviewView
     LaunchedEffect(hasCameraPermission, cameraSelector, previewView) {
         val pv = previewView
         if (hasCameraPermission && pv != null) {
@@ -227,7 +232,7 @@ fun CameraXSelfieDialog(
                     override fun onError(exception: ImageCaptureException) {
                         Log.e("CameraX", "Photo capture fallback: ${exception.message}", exception)
                         ContextCompat.getMainExecutor(context).execute {
-                            val fallbackFile = createSimulatedSelfieFile(context, eventType, projectName)
+                            val fallbackFile = createSimulatedSelfieFile(context, eventType, projectName, employeeName)
                             capturedImageFile = fallbackFile
                             capturedBitmap = BitmapFactory.decodeFile(fallbackFile.absolutePath)
                             isCapturing = false
@@ -239,7 +244,7 @@ fun CameraXSelfieDialog(
             // Simulated capture fallback for test containers/emulators
             coroutineScope.launch {
                 delay(300)
-                val fallbackFile = createSimulatedSelfieFile(context, eventType, projectName)
+                val fallbackFile = createSimulatedSelfieFile(context, eventType, projectName, employeeName)
                 capturedImageFile = fallbackFile
                 capturedBitmap = BitmapFactory.decodeFile(fallbackFile.absolutePath)
                 isCapturing = false
@@ -247,6 +252,593 @@ fun CameraXSelfieDialog(
         }
     }
 
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(28.dp)),
+        color = if (isDark) Color(0xFF0F0E13) else MaterialTheme.colorScheme.surface,
+        border = androidx.compose.foundation.BorderStroke(
+            1.5.dp,
+            if (isDark) SophisticatedDarkBorder else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+        ),
+        tonalElevation = 8.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // ==================== TOP NAVIGATION & HUD BAR ====================
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Event Badge (Clock In / Clock Out)
+                val isStart = eventType == ShiftEventType.START_SHIFT
+                val badgeColor = if (isStart) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = badgeColor.copy(alpha = 0.15f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, badgeColor.copy(alpha = 0.5f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(badgeColor)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (isStart) "IDENTITY VERIFICATION • CLOCK IN" else "IDENTITY VERIFICATION • CLOCK OUT",
+                            color = badgeColor,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp
+                        )
+                    }
+                }
+
+                // Top Right Controls (Fill Light, Grid, Close)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    // Screen Fill-Light Mode (For dark environments)
+                    IconButton(
+                        onClick = { isFillLightOn = !isFillLightOn },
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(if (isFillLightOn) MaterialTheme.colorScheme.primary.copy(alpha = 0.25f) else MaterialTheme.colorScheme.surfaceVariant)
+                            .testTag("toggle_fill_light_btn")
+                    ) {
+                        Icon(
+                            imageVector = if (isFillLightOn) Icons.Default.Lightbulb else Icons.Outlined.Lightbulb,
+                            contentDescription = "Fill Light",
+                            tint = if (isFillLightOn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+
+                    // Grid Toggle
+                    IconButton(
+                        onClick = { showGridLines = !showGridLines },
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(if (showGridLines) MaterialTheme.colorScheme.primary.copy(alpha = 0.25f) else MaterialTheme.colorScheme.surfaceVariant)
+                            .testTag("toggle_grid_btn")
+                    ) {
+                        Icon(
+                            imageVector = if (showGridLines) Icons.Default.GridOn else Icons.Default.GridOff,
+                            contentDescription = "Grid Lines",
+                            tint = if (showGridLines) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+
+                    // Close Dialog Button
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .testTag("close_camera_btn")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close Camera",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // ==================== MAIN VIEWFINDER BOX ====================
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(if (isFillLightOn) Color(0xFF2E2A1C) else Color.Black)
+                    .border(
+                        2.dp,
+                        if (isFillLightOn) MaterialTheme.colorScheme.primary.copy(alpha = 0.8f) else if (isDark) SophisticatedDarkBorder else MaterialTheme.colorScheme.outlineVariant,
+                        RoundedCornerShape(24.dp)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                if (capturedBitmap != null) {
+                    // ================= REVIEW MODE (Captured Image Preview) =================
+                    Image(
+                        bitmap = capturedBitmap!!.asImageBitmap(),
+                        contentDescription = "Captured Biometric Selfie",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+
+                    // Biometric Verification Stamp Overlay at Bottom
+                    Surface(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth(),
+                        color = Color.Black.copy(alpha = 0.88f)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        Icons.Default.Verified,
+                                        contentDescription = null,
+                                        tint = if (isDark) SophisticatedSuccess else SophisticatedLightSuccess,
+                                        modifier = Modifier.size(15.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "BIOMETRIC PHOTO VERIFIED",
+                                        color = if (isDark) SophisticatedSuccess else SophisticatedLightSuccess,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 0.5.sp
+                                    )
+                                }
+                                Surface(
+                                    shape = RoundedCornerShape(50),
+                                    color = Color(0xFF1E3A8A).copy(alpha = 0.6f)
+                                ) {
+                                    Text(
+                                        text = "PAYROLL READY",
+                                        color = Color(0xFF93C5FD),
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "Site: $projectName",
+                                    color = Color.White,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    text = serverTime.displayFormatted,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                    }
+                } else if (hasCameraPermission && !isCameraError) {
+                    // ================= LIVE CAMERAX PREVIEW =================
+                    AndroidView(
+                        factory = { ctx ->
+                            PreviewView(ctx).apply {
+                                scaleType = PreviewView.ScaleType.FILL_CENTER
+                                implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+                                previewView = this
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .testTag("camerax_live_preview")
+                    )
+
+                    // Rule of Thirds Grid Overlay
+                    if (showGridLines) {
+                        Canvas(modifier = Modifier.fillMaxSize()) {
+                            val w = size.width
+                            val h = size.height
+                            val gridColor = Color.White.copy(alpha = 0.25f)
+                            drawLine(gridColor, Offset(w / 3, 0f), Offset(w / 3, h), strokeWidth = 1f)
+                            drawLine(gridColor, Offset(2 * w / 3, 0f), Offset(2 * w / 3, h), strokeWidth = 1f)
+                            drawLine(gridColor, Offset(0f, h / 3), Offset(w, h / 3), strokeWidth = 1f)
+                            drawLine(gridColor, Offset(0f, 2 * h / 3), Offset(w, 2 * h / 3), strokeWidth = 1f)
+                        }
+                    }
+
+                    // High-Tech Biometric Face Oval Reticle
+                    Box(
+                        modifier = Modifier
+                            .size(210.dp, 280.dp)
+                            .clip(RoundedCornerShape(105.dp))
+                            .border(
+                                2.dp,
+                                if (isCapturing) (if (isDark) SophisticatedSuccess else SophisticatedLightSuccess) else MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
+                                RoundedCornerShape(105.dp)
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Face,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.20f),
+                            modifier = Modifier.size(88.dp)
+                        )
+                    }
+
+                    // HUD Corner Brackets
+                    BiometricHudCorners(modifier = Modifier.size(240.dp, 310.dp))
+
+                    // Animated Laser Scan Line
+                    val scanAnim = rememberInfiniteTransition(label = "camerax_scan")
+                    val yOffset by scanAnim.animateFloat(
+                        initialValue = 0f,
+                        targetValue = 260f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(1800, easing = FastOutSlowInEasing),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "laser_y"
+                    )
+                    Box(
+                        modifier = Modifier
+                            .width(220.dp)
+                            .height(2.5.dp)
+                            .offset(y = (yOffset - 130).dp)
+                            .background(
+                                Brush.horizontalGradient(
+                                    listOf(
+                                        Color.Transparent,
+                                        MaterialTheme.colorScheme.primary,
+                                        Color(0xFFFFD54F),
+                                        MaterialTheme.colorScheme.primary,
+                                        Color.Transparent
+                                    )
+                                )
+                            )
+                    )
+
+                    // Top Site & GPS Telemetry Overlay Chip
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = Color.Black.copy(alpha = 0.70f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(top = 12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.LocationOn,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(12.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "$projectName • Telemetry Ready",
+                                color = Color.White,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+
+                    // Bottom Guidance Text Badge
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = Color.Black.copy(alpha = 0.75f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)),
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isDark) SophisticatedSuccess else SophisticatedLightSuccess)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Align face within biometric guide",
+                                color = Color.White,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                } else {
+                    // ================= PERMISSION / SIMULATED VIEWPORT =================
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            border = androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary),
+                            modifier = Modifier.size(80.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = if (!hasCameraPermission) Icons.Default.CameraAlt else Icons.Default.Face,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(40.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Text(
+                            text = if (!hasCameraPermission) "Camera Access Needed" else "Biometric Facial Recognition Active",
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = if (!hasCameraPermission)
+                                "Please grant camera permission to capture your live identity verification selfie before starting work."
+                            else
+                                "Camera sensor active. Tap shutter button below to capture verified biometric selfie.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 12.sp,
+                            textAlign = TextAlign.Center,
+                            lineHeight = 16.sp
+                        )
+
+                        if (!hasCameraPermission) {
+                            Spacer(modifier = Modifier.height(14.dp))
+                            Button(
+                                onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary
+                                ),
+                                shape = RoundedCornerShape(50),
+                                modifier = Modifier.height(42.dp)
+                            ) {
+                                Icon(Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Allow Camera Access", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+
+                // Shutter White Flash Animation
+                if (showFlashEffect) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.White)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // ==================== BOTTOM CONTROLS / SHUTTER ROW ====================
+            if (capturedBitmap == null) {
+                // LIVE SHOOTING CONTROLS
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Switch Front / Back Camera
+                    IconButton(
+                        onClick = {
+                            cameraSelector = if (cameraSelector == CameraSelector.DEFAULT_FRONT_CAMERA) {
+                                CameraSelector.DEFAULT_BACK_CAMERA
+                            } else {
+                                CameraSelector.DEFAULT_FRONT_CAMERA
+                            }
+                        },
+                        modifier = Modifier
+                            .size(50.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
+                            .testTag("flip_camera_btn")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.FlipCameraAndroid,
+                            contentDescription = "Switch Camera",
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+
+                    // Main Big Shutter Trigger Button
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(76.dp)
+                            .clip(CircleShape)
+                            .background(
+                                Brush.radialGradient(
+                                    listOf(
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.35f),
+                                        Color.Transparent
+                                    )
+                                )
+                            )
+                            .border(3.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                            .clickable(enabled = !isCapturing) {
+                                triggerPhotoCapture()
+                            }
+                            .testTag("take_selfie_btn")
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = if (isCapturing) (if (isDark) SophisticatedSuccess else SophisticatedLightSuccess) else MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(58.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                if (isCapturing) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(24.dp),
+                                        color = MaterialTheme.colorScheme.onPrimary,
+                                        strokeWidth = 2.5.dp
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Default.CameraAlt,
+                                        contentDescription = "Capture Photo",
+                                        tint = MaterialTheme.colorScheme.onPrimary,
+                                        modifier = Modifier.size(28.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Simulated Quick Selfie Button (For Fast QA / Virtual Devices)
+                    IconButton(
+                        onClick = {
+                            isCapturing = true
+                            coroutineScope.launch {
+                                delay(200)
+                                val fallbackFile = createSimulatedSelfieFile(context, eventType, projectName, employeeName)
+                                capturedImageFile = fallbackFile
+                                capturedBitmap = BitmapFactory.decodeFile(fallbackFile.absolutePath)
+                                isCapturing = false
+                            }
+                        },
+                        modifier = Modifier
+                            .size(50.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
+                            .testTag("test_selfie_shortcut_btn")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.AutoFixHigh,
+                            contentDescription = "Instant Test Selfie",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                }
+            } else {
+                // REVIEW / CONFIRMATION ACTIONS
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedButton(
+                        onClick = {
+                            capturedBitmap = null
+                            capturedImageFile = null
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(52.dp)
+                            .testTag("retake_selfie_btn"),
+                        shape = RoundedCornerShape(50),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.onSurface
+                        )
+                    ) {
+                        Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Retake", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    }
+
+                    Button(
+                        onClick = {
+                            val path = capturedImageFile?.absolutePath ?: "selfie_verified_${System.currentTimeMillis()}"
+                            onCaptureComplete(path)
+                        },
+                        modifier = Modifier
+                            .weight(1.4f)
+                            .height(52.dp)
+                            .testTag("confirm_selfie_btn"),
+                        shape = RoundedCornerShape(50),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        )
+                    ) {
+                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (eventType == ShiftEventType.START_SHIFT) "Confirm & Clock In" else "Confirm & Clock Out",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Fullscreen / modal Dialog wrapper around [CameraXSelfieCaptureView].
+ */
+@Composable
+fun CameraXSelfieDialog(
+    eventType: ShiftEventType,
+    projectName: String,
+    employeeName: String? = null,
+    onDismiss: () -> Unit,
+    onCaptureComplete: (selfieFilePath: String) -> Unit
+) {
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(
@@ -255,584 +847,17 @@ fun CameraXSelfieDialog(
             dismissOnClickOutside = false
         )
     ) {
-        Surface(
+        CameraXSelfieCaptureView(
+            eventType = eventType,
+            projectName = projectName,
+            employeeName = employeeName,
             modifier = Modifier
                 .fillMaxWidth(0.96f)
-                .fillMaxHeight(0.90f)
-                .padding(vertical = 12.dp),
-            shape = RoundedCornerShape(32.dp),
-            color = Color(0xFF0F0E13),
-            border = androidx.compose.foundation.BorderStroke(1.5.dp, SophisticatedDarkBorder),
-            tonalElevation = 12.dp
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp, vertical = 16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // ==================== TOP NAVIGATION & HUD BAR ====================
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Event Pill
-                    val isStart = eventType == ShiftEventType.START_SHIFT
-                    Surface(
-                        shape = RoundedCornerShape(50),
-                        color = if (isStart) SophisticatedPrimary.copy(alpha = 0.15f) else Color(0xFFFF5252).copy(alpha = 0.15f),
-                        border = androidx.compose.foundation.BorderStroke(
-                            1.dp,
-                            if (isStart) SophisticatedPrimary.copy(alpha = 0.5f) else Color(0xFFFF5252).copy(alpha = 0.5f)
-                        )
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(8.dp)
-                                    .clip(CircleShape)
-                                    .background(if (isStart) SophisticatedPrimary else Color(0xFFFF5252))
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = if (isStart) "CLOCK IN SELFIE" else "CLOCK OUT SELFIE",
-                                color = if (isStart) SophisticatedPrimary else Color(0xFFFF5252),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 0.5.sp
-                            )
-                        }
-                    }
-
-                    // Top Right Controls (Fill Light, Grid, Close)
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        // Screen Fill-Light Mode (For dark environments)
-                        IconButton(
-                            onClick = { isFillLightOn = !isFillLightOn },
-                            modifier = Modifier
-                                .size(38.dp)
-                                .clip(CircleShape)
-                                .background(if (isFillLightOn) SophisticatedPrimary.copy(alpha = 0.3f) else Color(0xFF1E1D24))
-                                .testTag("toggle_fill_light_btn")
-                        ) {
-                            Icon(
-                                imageVector = if (isFillLightOn) Icons.Default.Lightbulb else Icons.Outlined.Lightbulb,
-                                contentDescription = "Fill Light",
-                                tint = if (isFillLightOn) SophisticatedPrimary else SophisticatedTextSecondary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-
-                        // Grid Toggle
-                        IconButton(
-                            onClick = { showGridLines = !showGridLines },
-                            modifier = Modifier
-                                .size(38.dp)
-                                .clip(CircleShape)
-                                .background(if (showGridLines) SophisticatedPrimary.copy(alpha = 0.3f) else Color(0xFF1E1D24))
-                                .testTag("toggle_grid_btn")
-                        ) {
-                            Icon(
-                                imageVector = if (showGridLines) Icons.Default.GridOn else Icons.Default.GridOff,
-                                contentDescription = "Grid Lines",
-                                tint = if (showGridLines) SophisticatedPrimary else SophisticatedTextSecondary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-
-                        // Close Dialog
-                        IconButton(
-                            onClick = onDismiss,
-                            modifier = Modifier
-                                .size(38.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFF1E1D24))
-                                .testTag("close_camera_btn")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "Close Camera",
-                                tint = SophisticatedTextSecondary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // ==================== MAIN VIEWFINDER BOX ====================
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(if (isFillLightOn) Color(0xFF332D1A) else Color.Black)
-                        .border(
-                            2.dp,
-                            if (isFillLightOn) SophisticatedPrimary.copy(alpha = 0.8f) else SophisticatedDarkBorder,
-                            RoundedCornerShape(24.dp)
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (capturedBitmap != null) {
-                        // ================= REVIEW MODE (Captured Image Preview) =================
-                        Image(
-                            bitmap = capturedBitmap!!.asImageBitmap(),
-                            contentDescription = "Captured Biometric Selfie",
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop
-                        )
-
-                        // Biometric Stamp Overlay at Bottom
-                        Surface(
-                            modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .fillMaxWidth(),
-                            color = Color.Black.copy(alpha = 0.88f)
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(
-                                            Icons.Default.Verified,
-                                            contentDescription = null,
-                                            tint = SophisticatedSuccess,
-                                            modifier = Modifier.size(14.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(5.dp))
-                                        Text(
-                                            text = "BIOMETRIC PHOTO CAPTURED",
-                                            color = SophisticatedSuccess,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            letterSpacing = 0.5.sp
-                                        )
-                                    }
-                                    Surface(
-                                        shape = RoundedCornerShape(50),
-                                        color = Color(0xFF1E3A8A).copy(alpha = 0.6f)
-                                    ) {
-                                        Text(
-                                            text = "PAYROLL READY",
-                                            color = Color(0xFF93C5FD),
-                                            fontSize = 9.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                                        )
-                                    }
-                                }
-
-                                Spacer(modifier = Modifier.height(4.dp))
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(
-                                        text = "Site: $projectName",
-                                        color = Color.White,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                    Text(
-                                        text = serverTime.displayFormatted,
-                                        color = SophisticatedPrimary,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                }
-                            }
-                        }
-                    } else if (hasCameraPermission && !isCameraError) {
-                        // ================= LIVE CAMERAX PREVIEW =================
-                        AndroidView(
-                            factory = { ctx ->
-                                PreviewView(ctx).apply {
-                                    scaleType = PreviewView.ScaleType.FILL_CENTER
-                                    implementationMode = PreviewView.ImplementationMode.COMPATIBLE
-                                    previewView = this
-                                }
-                            },
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .testTag("camerax_live_preview")
-                        )
-
-                        // Rule of Thirds Grid Overlay
-                        if (showGridLines) {
-                            Canvas(modifier = Modifier.fillMaxSize()) {
-                                val w = size.width
-                                val h = size.height
-                                val gridColor = Color.White.copy(alpha = 0.25f)
-                                // Verticals
-                                drawLine(gridColor, Offset(w / 3, 0f), Offset(w / 3, h), strokeWidth = 1f)
-                                drawLine(gridColor, Offset(2 * w / 3, 0f), Offset(2 * w / 3, h), strokeWidth = 1f)
-                                // Horizontals
-                                drawLine(gridColor, Offset(0f, h / 3), Offset(w, h / 3), strokeWidth = 1f)
-                                drawLine(gridColor, Offset(0f, 2 * h / 3), Offset(w, 2 * h / 3), strokeWidth = 1f)
-                            }
-                        }
-
-                        // High-Tech Biometric Face Oval Reticle
-                        Box(
-                            modifier = Modifier
-                                .size(210.dp, 280.dp)
-                                .clip(RoundedCornerShape(105.dp))
-                                .border(
-                                    2.dp,
-                                    if (isCapturing) SophisticatedSuccess else SophisticatedPrimary.copy(alpha = 0.85f),
-                                    RoundedCornerShape(105.dp)
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            // Subdued face avatar silhouette icon
-                            Icon(
-                                imageVector = Icons.Default.Face,
-                                contentDescription = null,
-                                tint = SophisticatedPrimary.copy(alpha = 0.20f),
-                                modifier = Modifier.size(88.dp)
-                            )
-                        }
-
-                        // Sci-Fi Glowing Corner HUD Brackets
-                        BiometricHudCorners(modifier = Modifier.size(240.dp, 310.dp))
-
-                        // Animated Laser Scan Bar
-                        val scanAnim = rememberInfiniteTransition(label = "camerax_scan")
-                        val yOffset by scanAnim.animateFloat(
-                            initialValue = 0f,
-                            targetValue = 260f,
-                            animationSpec = infiniteRepeatable(
-                                animation = tween(1800, easing = FastOutSlowInEasing),
-                                repeatMode = RepeatMode.Reverse
-                            ),
-                            label = "laser_y"
-                        )
-                        Box(
-                            modifier = Modifier
-                                .width(220.dp)
-                                .height(2.5.dp)
-                                .offset(y = (yOffset - 130).dp)
-                                .background(
-                                    Brush.horizontalGradient(
-                                        listOf(
-                                            Color.Transparent,
-                                            SophisticatedPrimary,
-                                            Color(0xFFFFD54F),
-                                            SophisticatedPrimary,
-                                            Color.Transparent
-                                        )
-                                    )
-                                )
-                        )
-
-                        // Top Site & GPS Telemetry Overlay Chip
-                        Surface(
-                            shape = RoundedCornerShape(50),
-                            color = Color.Black.copy(alpha = 0.70f),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
-                            modifier = Modifier
-                                .align(Alignment.TopCenter)
-                                .padding(top = 12.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.LocationOn,
-                                    contentDescription = null,
-                                    tint = SophisticatedPrimary,
-                                    modifier = Modifier.size(12.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = "$projectName • Payroll Telemetry Ready",
-                                    color = Color.White,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        }
-
-                        // Bottom Guidance Text Badge
-                        Surface(
-                            shape = RoundedCornerShape(50),
-                            color = Color.Black.copy(alpha = 0.75f),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, SophisticatedPrimary.copy(alpha = 0.4f)),
-                            modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .padding(bottom = 12.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(6.dp)
-                                        .clip(CircleShape)
-                                        .background(SophisticatedSuccess)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = "Position face within biometric guide",
-                                    color = Color.White,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
-                        }
-                    } else {
-                        // ================= SIMULATED / FALLBACK VIEWPORT =================
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(20.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            Surface(
-                                shape = CircleShape,
-                                color = Color(0xFF1E1D24),
-                                border = androidx.compose.foundation.BorderStroke(2.dp, SophisticatedPrimary),
-                                modifier = Modifier.size(90.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        imageVector = if (!hasCameraPermission) Icons.Default.CameraAlt else Icons.Default.Face,
-                                        contentDescription = null,
-                                        tint = SophisticatedPrimary,
-                                        modifier = Modifier.size(44.dp)
-                                    )
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(14.dp))
-                            Text(
-                                text = if (!hasCameraPermission) "Camera Permission Required" else "Biometric Facial Recognition Active",
-                                color = SophisticatedTextPrimary,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp,
-                                textAlign = TextAlign.Center
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                text = if (!hasCameraPermission)
-                                    "Tap 'Allow Camera' to activate your device's high-resolution live camera."
-                                else
-                                    "Simulated camera sensor active. Tap shutter button below to capture verified biometric selfie.",
-                                color = SophisticatedTextSecondary,
-                                fontSize = 12.sp,
-                                textAlign = TextAlign.Center,
-                                lineHeight = 16.sp
-                            )
-
-                            if (!hasCameraPermission) {
-                                Spacer(modifier = Modifier.height(14.dp))
-                                Button(
-                                    onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) },
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = SophisticatedPrimary,
-                                        contentColor = SophisticatedOnPrimary
-                                    ),
-                                    shape = RoundedCornerShape(50),
-                                    modifier = Modifier.height(40.dp)
-                                ) {
-                                    Icon(Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Allow Camera Access", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        }
-                    }
-
-                    // Shutter White Flash Animation
-                    if (showFlashEffect) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(Color.White)
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // ==================== BOTTOM CONTROLS / SHUTTER ROW ====================
-                if (capturedBitmap == null) {
-                    // LIVE SHOOTING CONTROLS
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Switch Front / Back Camera
-                        IconButton(
-                            onClick = {
-                                cameraSelector = if (cameraSelector == CameraSelector.DEFAULT_FRONT_CAMERA) {
-                                    CameraSelector.DEFAULT_BACK_CAMERA
-                                } else {
-                                    CameraSelector.DEFAULT_FRONT_CAMERA
-                                }
-                            },
-                            modifier = Modifier
-                                .size(50.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFF1E1D24))
-                                .border(1.dp, SophisticatedDarkBorder, CircleShape)
-                                .testTag("flip_camera_btn")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.FlipCameraAndroid,
-                                contentDescription = "Switch Camera",
-                                tint = SophisticatedTextPrimary,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-
-                        // Main Big Shutter Trigger Button
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier = Modifier
-                                .size(76.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    Brush.radialGradient(
-                                        listOf(
-                                            SophisticatedPrimary.copy(alpha = 0.4f),
-                                            Color.Transparent
-                                        )
-                                    )
-                                )
-                                .border(3.dp, SophisticatedPrimary, CircleShape)
-                                .clickable(enabled = !isCapturing) {
-                                    triggerPhotoCapture()
-                                }
-                                .testTag("take_selfie_btn")
-                        ) {
-                            Surface(
-                                shape = CircleShape,
-                                color = if (isCapturing) SophisticatedSuccess else SophisticatedPrimary,
-                                modifier = Modifier.size(58.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    if (isCapturing) {
-                                        CircularProgressIndicator(
-                                            modifier = Modifier.size(24.dp),
-                                            color = SophisticatedOnPrimary,
-                                            strokeWidth = 2.5.dp
-                                        )
-                                    } else {
-                                        Icon(
-                                            imageVector = Icons.Default.CameraAlt,
-                                            contentDescription = "Capture Photo",
-                                            tint = SophisticatedOnPrimary,
-                                            modifier = Modifier.size(28.dp)
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
-                        // Simulated Quick Selfie Button (For Fast QA / Testing)
-                        IconButton(
-                            onClick = {
-                                isCapturing = true
-                                coroutineScope.launch {
-                                    delay(200)
-                                    val fallbackFile = createSimulatedSelfieFile(context, eventType, projectName)
-                                    capturedImageFile = fallbackFile
-                                    capturedBitmap = BitmapFactory.decodeFile(fallbackFile.absolutePath)
-                                    isCapturing = false
-                                }
-                            },
-                            modifier = Modifier
-                                .size(50.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFF1E1D24))
-                                .border(1.dp, SophisticatedDarkBorder, CircleShape)
-                                .testTag("test_selfie_shortcut_btn")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.AutoFixHigh,
-                                contentDescription = "Test Selfie",
-                                tint = SophisticatedPrimary,
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
-                    }
-                } else {
-                    // REVIEW / CONFIRMATION ACTIONS
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        OutlinedButton(
-                            onClick = {
-                                capturedBitmap = null
-                                capturedImageFile = null
-                            },
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(52.dp)
-                                .testTag("retake_selfie_btn"),
-                            shape = RoundedCornerShape(50),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, SophisticatedDarkBorder),
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = SophisticatedTextPrimary
-                            )
-                        ) {
-                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Retake", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                        }
-
-                        Button(
-                            onClick = {
-                                val path = capturedImageFile?.absolutePath ?: "selfie_verified_${System.currentTimeMillis()}"
-                                onCaptureComplete(path)
-                            },
-                            modifier = Modifier
-                                .weight(1.4f)
-                                .height(52.dp)
-                                .testTag("confirm_selfie_btn"),
-                            shape = RoundedCornerShape(50),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = SophisticatedPrimary,
-                                contentColor = SophisticatedOnPrimary
-                            )
-                        ) {
-                            Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = if (eventType == ShiftEventType.START_SHIFT) "Confirm & Clock In" else "Confirm & Clock Out",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
-            }
-        }
+                .fillMaxHeight(0.92f)
+                .padding(vertical = 10.dp),
+            onDismiss = onDismiss,
+            onCaptureComplete = onCaptureComplete
+        )
     }
 }
 
@@ -841,33 +866,38 @@ fun CameraXSelfieDialog(
  */
 @Composable
 private fun BiometricHudCorners(modifier: Modifier = Modifier) {
+    val primaryColor = MaterialTheme.colorScheme.primary
     Canvas(modifier = modifier) {
         val bracketLen = 30f
         val strokeW = 3f
-        val color = Color(0xFFD4AF37) // Sophisticated Gold
 
         // Top-Left
-        drawLine(color, Offset(0f, 0f), Offset(bracketLen, 0f), strokeWidth = strokeW)
-        drawLine(color, Offset(0f, 0f), Offset(0f, bracketLen), strokeWidth = strokeW)
+        drawLine(primaryColor, Offset(0f, 0f), Offset(bracketLen, 0f), strokeWidth = strokeW)
+        drawLine(primaryColor, Offset(0f, 0f), Offset(0f, bracketLen), strokeWidth = strokeW)
 
         // Top-Right
-        drawLine(color, Offset(size.width, 0f), Offset(size.width - bracketLen, 0f), strokeWidth = strokeW)
-        drawLine(color, Offset(size.width, 0f), Offset(size.width, bracketLen), strokeWidth = strokeW)
+        drawLine(primaryColor, Offset(size.width, 0f), Offset(size.width - bracketLen, 0f), strokeWidth = strokeW)
+        drawLine(primaryColor, Offset(size.width, 0f), Offset(size.width, bracketLen), strokeWidth = strokeW)
 
         // Bottom-Left
-        drawLine(color, Offset(0f, size.height), Offset(bracketLen, size.height), strokeWidth = strokeW)
-        drawLine(color, Offset(0f, size.height), Offset(0f, size.height - bracketLen), strokeWidth = strokeW)
+        drawLine(primaryColor, Offset(0f, size.height), Offset(bracketLen, size.height), strokeWidth = strokeW)
+        drawLine(primaryColor, Offset(0f, size.height), Offset(0f, size.height - bracketLen), strokeWidth = strokeW)
 
         // Bottom-Right
-        drawLine(color, Offset(size.width, size.height), Offset(size.width - bracketLen, size.height), strokeWidth = strokeW)
-        drawLine(color, Offset(size.width, size.height), Offset(size.width, size.height - bracketLen), strokeWidth = strokeW)
+        drawLine(primaryColor, Offset(size.width, size.height), Offset(size.width - bracketLen, size.height), strokeWidth = strokeW)
+        drawLine(primaryColor, Offset(size.width, size.height), Offset(size.width, size.height - bracketLen), strokeWidth = strokeW)
     }
 }
 
 /**
  * Creates an official verified selfie bitmap with employee telemetry watermark for virtual environments and fallback captures.
  */
-private fun createSimulatedSelfieFile(context: Context, eventType: ShiftEventType, projectName: String): File {
+private fun createSimulatedSelfieFile(
+    context: Context,
+    eventType: ShiftEventType,
+    projectName: String,
+    employeeName: String? = null
+): File {
     val file = File(context.cacheDir, "selfie_biometric_${eventType.name.lowercase()}_${System.currentTimeMillis()}.jpg")
     try {
         val width = 540
@@ -911,20 +941,21 @@ private fun createSimulatedSelfieFile(context: Context, eventType: ShiftEventTyp
         canvas.drawRect(0f, height - 140f, width.toFloat(), height.toFloat(), paint)
 
         paint.color = android.graphics.Color.parseColor("#D4AF37")
-        paint.textSize = 22f
+        paint.textSize = 21f
         paint.isFakeBoldText = true
         paint.textAlign = android.graphics.Paint.Align.CENTER
         canvas.drawText("ARTIFY BIOMETRIC VERIFIED SELFIE", width / 2f, height - 95f, paint)
 
         paint.color = android.graphics.Color.parseColor("#9CA3AF")
-        paint.textSize = 17f
+        paint.textSize = 16f
         paint.isFakeBoldText = false
         val timeStr = SimpleDateFormat("dd MMM yyyy HH:mm:ss 'UTC'", Locale.ENGLISH).format(Date())
-        canvas.drawText("$timeStr • $projectName", width / 2f, height - 65f, paint)
+        val nameLabel = if (!employeeName.isNullOrBlank()) "$employeeName • " else ""
+        canvas.drawText("$nameLabel$projectName", width / 2f, height - 65f, paint)
 
         paint.color = android.graphics.Color.parseColor("#60A5FA")
         paint.textSize = 14f
-        canvas.drawText("PAYROLL TELEMETRY SYNCED", width / 2f, height - 35f, paint)
+        canvas.drawText("$timeStr • PAYROLL VERIFIED", width / 2f, height - 35f, paint)
 
         FileOutputStream(file).use { out ->
             bitmap.compress(Bitmap.CompressFormat.JPEG, 92, out)

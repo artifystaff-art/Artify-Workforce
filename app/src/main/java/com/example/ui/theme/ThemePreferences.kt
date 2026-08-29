@@ -41,11 +41,11 @@ class ThemePreferences(context: Context) {
     val settings: StateFlow<ThemeSettings> = _settings.asStateFlow()
 
     private fun loadSettings(): ThemeSettings {
-        val modeStr = prefs.getString(KEY_THEME_MODE, ThemeMode.DARK.name) ?: ThemeMode.DARK.name
+        val modeStr = prefs.getString(KEY_THEME_MODE, ThemeMode.SYSTEM.name) ?: ThemeMode.SYSTEM.name
         val themeMode = try {
             ThemeMode.valueOf(modeStr)
         } catch (e: Exception) {
-            ThemeMode.DARK
+            ThemeMode.SYSTEM
         }
 
         val defaultDynamic = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
@@ -79,6 +79,20 @@ class ThemePreferences(context: Context) {
             ThemeMode.DARK -> ThemeMode.LIGHT
             ThemeMode.LIGHT -> ThemeMode.DARK
             ThemeMode.SYSTEM -> ThemeMode.LIGHT
+        }
+        setThemeMode(newMode)
+    }
+
+    fun toggleTheme(currentIsDark: Boolean) {
+        val newMode = if (currentIsDark) ThemeMode.LIGHT else ThemeMode.DARK
+        setThemeMode(newMode)
+    }
+
+    fun cycleThemeMode() {
+        val newMode = when (_settings.value.themeMode) {
+            ThemeMode.SYSTEM -> ThemeMode.LIGHT
+            ThemeMode.LIGHT -> ThemeMode.DARK
+            ThemeMode.DARK -> ThemeMode.SYSTEM
         }
         setThemeMode(newMode)
     }

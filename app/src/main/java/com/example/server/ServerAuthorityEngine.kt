@@ -44,7 +44,11 @@ data class ServerTimestampResult(
     val timestampUtc: Long,
     val displayFormatted: String,
     val dateString: String,
-    val timezone: String = "UTC+4 (Gulf Standard Time)"
+    val timezone: String = "UTC+4 (Gulf Standard Time)",
+    val isNtpSynchronized: Boolean = false,
+    val isDeviceTimeTampered: Boolean = false,
+    val timeSource: String = "NTP / Authoritative Time",
+    val clockDriftMs: Long = 0L
 )
 
 object ServerAuthorityEngine {
@@ -53,7 +57,9 @@ object ServerAuthorityEngine {
     private var simulatedServerTimeOffsetMillis: Long = 0L
 
     fun getServerTimestamp(): ServerTimestampResult {
-        val serverTimeUtc = System.currentTimeMillis() + simulatedServerTimeOffsetMillis
+        val ntpSyncState = NtpTimeService.syncState.value
+        val (isTampered, driftMs) = NtpTimeService.checkDeviceClockTampering()
+        val serverTimeUtc = NtpTimeService.getAuthoritativeTimeMs() + simulatedServerTimeOffsetMillis
         val date = Date(serverTimeUtc)
 
         val displayFormat = SimpleDateFormat("dd MMM yyyy HH:mm:ss", Locale.ENGLISH).apply {
@@ -66,7 +72,11 @@ object ServerAuthorityEngine {
         return ServerTimestampResult(
             timestampUtc = serverTimeUtc,
             displayFormatted = displayFormat.format(date),
-            dateString = dateFormat.format(date)
+            dateString = dateFormat.format(date),
+            isNtpSynchronized = ntpSyncState.isSynchronized,
+            isDeviceTimeTampered = isTampered,
+            timeSource = if (ntpSyncState.isSynchronized) ntpSyncState.serverUsed else ntpSyncState.syncMethod.displayName,
+            clockDriftMs = driftMs
         )
     }
 

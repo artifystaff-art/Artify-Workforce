@@ -74,6 +74,9 @@ data class AttendanceEntity(
     val reviewedAtUtc: Long? = null,
     val syncedToErp: Boolean = false,
     val erpIdempotencyKey: String? = null,
+    val syncedToFirestore: Boolean = false,
+    val firestoreSyncStatus: String = "QUEUED_OFFLINE", // QUEUED_OFFLINE, SYNCING, SYNCED, FAILED
+    val firestoreSyncedAtUtc: Long? = null,
     val createdAtUtc: Long
 )
 
