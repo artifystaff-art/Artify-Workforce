@@ -231,7 +231,7 @@ class WorkerViewModel(
         }
     }
 
-    fun endShift(selfieData: String) {
+    fun endShift(selfieData: String? = null) {
         val project = _uiState.value.assignedProject
         if (project == null) {
             _uiState.value = _uiState.value.copy(errorMessage = "No assigned project found.")

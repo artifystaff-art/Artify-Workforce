@@ -65,9 +65,9 @@ fun SupervisorDashboardScreen(
         },
         bottomBar = {
             NavigationBar(
-                containerColor = SophisticatedDarkNav,
-                contentColor = SophisticatedPrimary,
-                tonalElevation = 0.dp
+                containerColor = MaterialTheme.colorScheme.surface,
+                contentColor = MaterialTheme.colorScheme.primary,
+                tonalElevation = 3.dp
             ) {
                 NavigationBarItem(
                     selected = selectedTab == 0,
@@ -88,11 +88,11 @@ fun SupervisorDashboardScreen(
                     label = { Text("Approvals") },
                     modifier = Modifier.testTag("nav_approvals"),
                     colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = SophisticatedPrimary,
-                        indicatorColor = SophisticatedPrimaryContainer,
-                        unselectedIconColor = SophisticatedTextSecondary,
-                        unselectedTextColor = SophisticatedTextSecondary,
-                        selectedTextColor = SophisticatedPrimary
+                        selectedIconColor = MaterialTheme.colorScheme.primary,
+                        indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        selectedTextColor = MaterialTheme.colorScheme.primary
                     )
                 )
                 NavigationBarItem(
@@ -102,11 +102,11 @@ fun SupervisorDashboardScreen(
                     label = { Text("Roster") },
                     modifier = Modifier.testTag("nav_roster"),
                     colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = SophisticatedPrimary,
-                        indicatorColor = SophisticatedPrimaryContainer,
-                        unselectedIconColor = SophisticatedTextSecondary,
-                        unselectedTextColor = SophisticatedTextSecondary,
-                        selectedTextColor = SophisticatedPrimary
+                        selectedIconColor = MaterialTheme.colorScheme.primary,
+                        indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        selectedTextColor = MaterialTheme.colorScheme.primary
                     )
                 )
                 NavigationBarItem(
@@ -116,7 +116,7 @@ fun SupervisorDashboardScreen(
                         BadgedBox(
                             badge = {
                                 if (uiState.pendingLeaveRequests.isNotEmpty()) {
-                                    Badge(containerColor = SophisticatedSecondary) {
+                                    Badge(containerColor = MaterialTheme.colorScheme.secondary) {
                                         Text(uiState.pendingLeaveRequests.size.toString())
                                     }
                                 }
@@ -128,11 +128,11 @@ fun SupervisorDashboardScreen(
                     label = { Text("Leave") },
                     modifier = Modifier.testTag("nav_sup_leave"),
                     colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = SophisticatedPrimary,
-                        indicatorColor = SophisticatedPrimaryContainer,
-                        unselectedIconColor = SophisticatedTextSecondary,
-                        unselectedTextColor = SophisticatedTextSecondary,
-                        selectedTextColor = SophisticatedPrimary
+                        selectedIconColor = MaterialTheme.colorScheme.primary,
+                        indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        selectedTextColor = MaterialTheme.colorScheme.primary
                     )
                 )
                 NavigationBarItem(
@@ -142,11 +142,11 @@ fun SupervisorDashboardScreen(
                     label = { Text("Sites") },
                     modifier = Modifier.testTag("nav_sites"),
                     colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = SophisticatedPrimary,
-                        indicatorColor = SophisticatedPrimaryContainer,
-                        unselectedIconColor = SophisticatedTextSecondary,
-                        unselectedTextColor = SophisticatedTextSecondary,
-                        selectedTextColor = SophisticatedPrimary
+                        selectedIconColor = MaterialTheme.colorScheme.primary,
+                        indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        selectedTextColor = MaterialTheme.colorScheme.primary
                     )
                 )
                 NavigationBarItem(
@@ -156,11 +156,11 @@ fun SupervisorDashboardScreen(
                     label = { Text("ERP") },
                     modifier = Modifier.testTag("nav_audit_erp"),
                     colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = SophisticatedPrimary,
-                        indicatorColor = SophisticatedPrimaryContainer,
-                        unselectedIconColor = SophisticatedTextSecondary,
-                        unselectedTextColor = SophisticatedTextSecondary,
-                        selectedTextColor = SophisticatedPrimary
+                        selectedIconColor = MaterialTheme.colorScheme.primary,
+                        indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        selectedTextColor = MaterialTheme.colorScheme.primary
                     )
                 )
             }

@@ -33,9 +33,9 @@ import com.example.ui.theme.*
  * Visual styling variants for [DarkThemeCard].
  */
 enum class DarkThemeCardVariant {
-    /** Standard dark surface card with subtle border */
+    /** Standard surface card with subtle border */
     Surface,
-    /** Elevated darker surface with enhanced contrast */
+    /** Elevated surface with enhanced contrast */
     Elevated,
     /** Outlined translucent container */
     Outlined,
@@ -46,7 +46,7 @@ enum class DarkThemeCardVariant {
 }
 
 /**
- * Reusable Material 3 Card tailored to the Artify Workforce Dark Theme specifications.
+ * Reusable Material 3 Card tailored to the Artify Workforce specifications with Light & Dark support.
  */
 @Composable
 fun DarkThemeCard(
@@ -58,20 +58,21 @@ fun DarkThemeCard(
     testTag: String? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val isDark = LocalIsDarkTheme.current
     val containerColor = when (variant) {
-        DarkThemeCardVariant.Surface -> SophisticatedDarkSurface
-        DarkThemeCardVariant.Elevated -> SophisticatedDarkSurfaceHigh
+        DarkThemeCardVariant.Surface -> MaterialTheme.colorScheme.surface
+        DarkThemeCardVariant.Elevated -> MaterialTheme.colorScheme.surfaceVariant
         DarkThemeCardVariant.Outlined -> Color.Transparent
-        DarkThemeCardVariant.Accent -> SophisticatedDarkSurface
-        DarkThemeCardVariant.Subtle -> SophisticatedDarkBg
+        DarkThemeCardVariant.Accent -> MaterialTheme.colorScheme.surface
+        DarkThemeCardVariant.Subtle -> if (isDark) SophisticatedDarkBg else SophisticatedLightBg
     }
 
     val border = when (variant) {
-        DarkThemeCardVariant.Surface -> BorderStroke(1.dp, SophisticatedDarkBorder)
-        DarkThemeCardVariant.Elevated -> BorderStroke(1.dp, SophisticatedDarkBorderLight)
-        DarkThemeCardVariant.Outlined -> BorderStroke(1.dp, SophisticatedDarkBorder)
-        DarkThemeCardVariant.Accent -> BorderStroke(1.dp, SophisticatedPrimary.copy(alpha = 0.5f))
-        DarkThemeCardVariant.Subtle -> BorderStroke(1.dp, SophisticatedDarkBorder.copy(alpha = 0.5f))
+        DarkThemeCardVariant.Surface -> BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        DarkThemeCardVariant.Elevated -> BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.8f))
+        DarkThemeCardVariant.Outlined -> BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.6f))
+        DarkThemeCardVariant.Accent -> BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.6f))
+        DarkThemeCardVariant.Subtle -> BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
     }
 
     val cardModifier = modifier
@@ -150,13 +151,14 @@ fun DarkThemeButton(
     shape: Shape = RoundedCornerShape(50),
     testTag: String? = null
 ) {
+    val isDark = LocalIsDarkTheme.current
     val (containerColor, contentColor) = when (variant) {
-        DarkThemeButtonVariant.Primary -> Pair(SophisticatedPrimary, SophisticatedOnPrimary)
-        DarkThemeButtonVariant.Secondary -> Pair(SophisticatedSecondary, Color(0xFF332D41))
-        DarkThemeButtonVariant.Success -> Pair(SophisticatedSuccess, Color(0xFF1D2E1F))
-        DarkThemeButtonVariant.Warning -> Pair(SophisticatedWarning, Color(0xFF382500))
-        DarkThemeButtonVariant.Error -> Pair(SophisticatedError, Color(0xFF601410))
-        DarkThemeButtonVariant.Neutral -> Pair(SophisticatedDarkSurfaceHigh, SophisticatedTextPrimary)
+        DarkThemeButtonVariant.Primary -> Pair(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.onPrimary)
+        DarkThemeButtonVariant.Secondary -> Pair(MaterialTheme.colorScheme.secondary, MaterialTheme.colorScheme.onSecondary)
+        DarkThemeButtonVariant.Success -> Pair(if (isDark) SophisticatedSuccess else SophisticatedLightSuccess, if (isDark) Color(0xFF1D2E1F) else Color.White)
+        DarkThemeButtonVariant.Warning -> Pair(if (isDark) SophisticatedWarning else SophisticatedLightWarning, if (isDark) Color(0xFF382500) else Color.White)
+        DarkThemeButtonVariant.Error -> Pair(MaterialTheme.colorScheme.error, MaterialTheme.colorScheme.onError)
+        DarkThemeButtonVariant.Neutral -> Pair(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.onSurfaceVariant)
     }
 
     val buttonModifier = modifier
@@ -172,8 +174,8 @@ fun DarkThemeButton(
         colors = ButtonDefaults.buttonColors(
             containerColor = containerColor,
             contentColor = contentColor,
-            disabledContainerColor = SophisticatedDarkBorder,
-            disabledContentColor = SophisticatedTextMuted
+            disabledContainerColor = MaterialTheme.colorScheme.outlineVariant,
+            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
         )
     ) {
         if (isLoading) {
@@ -238,13 +240,20 @@ fun DarkThemeOutlinedButton(
     shape: Shape = RoundedCornerShape(50),
     testTag: String? = null
 ) {
+    val isDark = LocalIsDarkTheme.current
     val (borderColor, textColor) = when (variant) {
-        DarkThemeButtonVariant.Primary -> Pair(SophisticatedPrimary.copy(alpha = 0.6f), SophisticatedPrimary)
-        DarkThemeButtonVariant.Secondary -> Pair(SophisticatedSecondary.copy(alpha = 0.6f), SophisticatedSecondary)
-        DarkThemeButtonVariant.Success -> Pair(SophisticatedSuccess.copy(alpha = 0.6f), SophisticatedSuccess)
-        DarkThemeButtonVariant.Warning -> Pair(SophisticatedWarning.copy(alpha = 0.6f), SophisticatedWarning)
-        DarkThemeButtonVariant.Error -> Pair(SophisticatedError.copy(alpha = 0.6f), SophisticatedError)
-        DarkThemeButtonVariant.Neutral -> Pair(SophisticatedDarkBorder, SophisticatedTextSecondary)
+        DarkThemeButtonVariant.Primary -> Pair(MaterialTheme.colorScheme.primary.copy(alpha = 0.6f), MaterialTheme.colorScheme.primary)
+        DarkThemeButtonVariant.Secondary -> Pair(MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f), MaterialTheme.colorScheme.secondary)
+        DarkThemeButtonVariant.Success -> Pair(
+            (if (isDark) SophisticatedSuccess else SophisticatedLightSuccess).copy(alpha = 0.6f),
+            if (isDark) SophisticatedSuccess else SophisticatedLightSuccess
+        )
+        DarkThemeButtonVariant.Warning -> Pair(
+            (if (isDark) SophisticatedWarning else SophisticatedLightWarning).copy(alpha = 0.6f),
+            if (isDark) SophisticatedWarning else SophisticatedLightWarning
+        )
+        DarkThemeButtonVariant.Error -> Pair(MaterialTheme.colorScheme.error.copy(alpha = 0.6f), MaterialTheme.colorScheme.error)
+        DarkThemeButtonVariant.Neutral -> Pair(MaterialTheme.colorScheme.outlineVariant, MaterialTheme.colorScheme.onSurfaceVariant)
     }
 
     val buttonModifier = modifier
@@ -257,10 +266,10 @@ fun DarkThemeOutlinedButton(
         enabled = enabled && !isLoading,
         shape = shape,
         contentPadding = PaddingValues(horizontal = size.horizontalPadding),
-        border = BorderStroke(1.dp, if (enabled) borderColor else SophisticatedDarkBorder.copy(alpha = 0.5f)),
+        border = BorderStroke(1.dp, if (enabled) borderColor else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
         colors = ButtonDefaults.outlinedButtonColors(
             contentColor = textColor,
-            disabledContentColor = SophisticatedTextMuted
+            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
         )
     ) {
         if (isLoading) {
@@ -314,7 +323,7 @@ fun DarkThemeTextButton(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    color: Color = SophisticatedPrimary,
+    color: Color = MaterialTheme.colorScheme.primary,
     enabled: Boolean = true,
     leadingIcon: ImageVector? = null,
     testTag: String? = null
@@ -328,7 +337,7 @@ fun DarkThemeTextButton(
         enabled = enabled,
         colors = ButtonDefaults.textButtonColors(
             contentColor = color,
-            disabledContentColor = SophisticatedTextMuted
+            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
         )
     ) {
         if (leadingIcon != null) {
@@ -348,7 +357,7 @@ fun DarkThemeTextButton(
 }
 
 /**
- * Reusable Material 3 Icon Button with custom dark-themed circular background option.
+ * Reusable Material 3 Icon Button with circular background option.
  */
 @Composable
 fun DarkThemeIconButton(
@@ -356,9 +365,9 @@ fun DarkThemeIconButton(
     onClick: () -> Unit,
     contentDescription: String?,
     modifier: Modifier = Modifier,
-    tint: Color = SophisticatedTextSecondary,
+    tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     withContainer: Boolean = false,
-    containerColor: Color = SophisticatedDarkSurface,
+    containerColor: Color = MaterialTheme.colorScheme.surfaceVariant,
     testTag: String? = null
 ) {
     val buttonModifier = modifier
@@ -370,7 +379,7 @@ fun DarkThemeIconButton(
             modifier = buttonModifier.size(40.dp),
             shape = CircleShape,
             color = containerColor,
-            border = BorderStroke(1.dp, SophisticatedDarkBorder)
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(
@@ -418,13 +427,38 @@ fun DarkThemeStatusBadge(
     showDot: Boolean = true,
     icon: ImageVector? = null
 ) {
+    val isDark = LocalIsDarkTheme.current
     val (bg, fg, border) = when (statusType) {
-        DarkThemeStatusType.Success -> Triple(SophisticatedSuccessContainer, SophisticatedSuccess, SophisticatedSuccessBorder)
-        DarkThemeStatusType.Warning -> Triple(SophisticatedWarningContainer, SophisticatedWarning, SophisticatedWarning.copy(alpha = 0.4f))
-        DarkThemeStatusType.Error -> Triple(SophisticatedErrorContainer, SophisticatedError, SophisticatedError.copy(alpha = 0.4f))
-        DarkThemeStatusType.Primary -> Triple(SophisticatedPrimaryContainer, SophisticatedPrimary, SophisticatedPrimary.copy(alpha = 0.4f))
-        DarkThemeStatusType.Secondary -> Triple(SophisticatedBadgeBg, SophisticatedSecondary, SophisticatedSecondary.copy(alpha = 0.3f))
-        DarkThemeStatusType.Neutral -> Triple(SophisticatedBadgeBg, SophisticatedTextSecondary, SophisticatedDarkBorder)
+        DarkThemeStatusType.Success -> Triple(
+            if (isDark) SophisticatedSuccessContainer else SophisticatedLightSuccessContainer,
+            if (isDark) SophisticatedSuccess else SophisticatedLightSuccess,
+            if (isDark) SophisticatedSuccessBorder else SophisticatedLightSuccessBorder
+        )
+        DarkThemeStatusType.Warning -> Triple(
+            if (isDark) SophisticatedWarningContainer else SophisticatedLightWarningContainer,
+            if (isDark) SophisticatedWarning else SophisticatedLightWarning,
+            (if (isDark) SophisticatedWarning else SophisticatedLightWarning).copy(alpha = 0.4f)
+        )
+        DarkThemeStatusType.Error -> Triple(
+            MaterialTheme.colorScheme.errorContainer,
+            MaterialTheme.colorScheme.error,
+            MaterialTheme.colorScheme.error.copy(alpha = 0.4f)
+        )
+        DarkThemeStatusType.Primary -> Triple(
+            MaterialTheme.colorScheme.primaryContainer,
+            MaterialTheme.colorScheme.primary,
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
+        )
+        DarkThemeStatusType.Secondary -> Triple(
+            MaterialTheme.colorScheme.secondaryContainer,
+            MaterialTheme.colorScheme.secondary,
+            MaterialTheme.colorScheme.secondary.copy(alpha = 0.3f)
+        )
+        DarkThemeStatusType.Neutral -> Triple(
+            MaterialTheme.colorScheme.surfaceVariant,
+            MaterialTheme.colorScheme.onSurfaceVariant,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+        )
     }
 
     Surface(
@@ -467,7 +501,7 @@ fun DarkThemeStatusBadge(
 }
 
 /**
- * Reusable Dark Theme Outlined Text Field with custom styling and validation borders.
+ * Reusable Outlined Text Field with custom styling and validation borders.
  */
 @Composable
 fun DarkThemeTextField(
@@ -497,10 +531,10 @@ fun DarkThemeTextField(
             modifier = fieldModifier,
             label = if (label != null) { { Text(label) } } else null,
             placeholder = if (placeholder != null) {
-                { Text(placeholder, color = SophisticatedTextMuted) }
+                { Text(placeholder, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)) }
             } else null,
             leadingIcon = if (leadingIcon != null) {
-                { Icon(leadingIcon, contentDescription = null, tint = SophisticatedTextSecondary) }
+                { Icon(leadingIcon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
             } else null,
             trailingIcon = trailingIcon,
             isError = isError,
@@ -509,17 +543,17 @@ fun DarkThemeTextField(
             readOnly = readOnly,
             shape = shape,
             colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = SophisticatedTextPrimary,
-                unfocusedTextColor = SophisticatedTextPrimary,
-                focusedBorderColor = SophisticatedPrimary,
-                unfocusedBorderColor = SophisticatedDarkBorder,
-                errorBorderColor = SophisticatedError,
-                focusedLabelColor = SophisticatedPrimary,
-                unfocusedLabelColor = SophisticatedTextSecondary,
-                cursorColor = SophisticatedPrimary,
-                focusedContainerColor = SophisticatedDarkSurface,
-                unfocusedContainerColor = SophisticatedDarkSurface,
-                errorContainerColor = SophisticatedDarkSurface
+                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                errorBorderColor = MaterialTheme.colorScheme.error,
+                focusedLabelColor = MaterialTheme.colorScheme.primary,
+                unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                cursorColor = MaterialTheme.colorScheme.primary,
+                focusedContainerColor = MaterialTheme.colorScheme.surface,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                errorContainerColor = MaterialTheme.colorScheme.surface
             )
         )
 
@@ -527,7 +561,7 @@ fun DarkThemeTextField(
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = errorMessage,
-                color = SophisticatedError,
+                color = MaterialTheme.colorScheme.error,
                 fontSize = 11.sp,
                 modifier = Modifier.padding(start = 12.dp)
             )
@@ -550,8 +584,8 @@ fun DarkThemeMetricCard(
     Surface(
         modifier = modifier.then(if (testTag != null) Modifier.testTag(testTag) else Modifier),
         shape = RoundedCornerShape(16.dp),
-        color = SophisticatedDarkSurface,
-        border = BorderStroke(1.dp, SophisticatedDarkBorder)
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
     ) {
         Column(
             modifier = Modifier.padding(14.dp),
@@ -575,7 +609,7 @@ fun DarkThemeMetricCard(
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = label,
-                color = SophisticatedTextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Medium,
                 textAlign = TextAlign.Center,
@@ -609,14 +643,14 @@ fun DarkThemeSectionHeader(
                 text = title,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
-                color = SophisticatedTextPrimary
+                color = MaterialTheme.colorScheme.onSurface
             )
             if (subtitle != null) {
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = subtitle,
                     fontSize = 12.sp,
-                    color = SophisticatedTextSecondary
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -624,7 +658,7 @@ fun DarkThemeSectionHeader(
             TextButton(onClick = onActionClick) {
                 Text(
                     text = actionText,
-                    color = SophisticatedPrimary,
+                    color = MaterialTheme.colorScheme.primary,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -634,7 +668,7 @@ fun DarkThemeSectionHeader(
 }
 
 /**
- * Reusable Material 3 Dialog Container for the Dark Theme.
+ * Reusable Material 3 Dialog Container.
  */
 @Composable
 fun DarkThemeDialog(
@@ -650,8 +684,8 @@ fun DarkThemeDialog(
                 .fillMaxWidth()
                 .wrapContentHeight(),
             shape = RoundedCornerShape(24.dp),
-            color = SophisticatedDarkSurface,
-            border = BorderStroke(1.dp, SophisticatedDarkBorder),
+            color = MaterialTheme.colorScheme.surface,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
             tonalElevation = 6.dp
         ) {
             Column(modifier = Modifier.padding(22.dp)) {
@@ -665,12 +699,12 @@ fun DarkThemeDialog(
                             text = title,
                             fontWeight = FontWeight.Bold,
                             fontSize = 17.sp,
-                            color = SophisticatedTextPrimary
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         if (subtitle != null) {
                             Text(
                                 text = subtitle,
-                                color = SophisticatedTextSecondary,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 12.sp
                             )
                         }
@@ -679,7 +713,7 @@ fun DarkThemeDialog(
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Close Dialog",
-                            tint = SophisticatedTextSecondary
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -692,12 +726,12 @@ fun DarkThemeDialog(
 }
 
 /**
- * Reusable subtle 1dp Divider matching the dark theme palette.
+ * Reusable subtle 1dp Divider matching the current theme palette.
  */
 @Composable
 fun DarkThemeDivider(
     modifier: Modifier = Modifier,
-    color: Color = SophisticatedDarkBorder
+    color: Color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
 ) {
     HorizontalDivider(
         modifier = modifier,
@@ -705,3 +739,4 @@ fun DarkThemeDivider(
         color = color
     )
 }
+

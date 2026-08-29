@@ -57,6 +57,7 @@ fun ArtifyAppRoot() {
     var projects by remember { mutableStateOf<List<com.example.data.entity.ProjectEntity>>(emptyList()) }
 
     LaunchedEffect(Unit) {
+        repository.seedInitialDataIfEmpty()
         repository.getAllProjects().collect {
             projects = it
         }

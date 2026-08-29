@@ -533,7 +533,7 @@ class WorkforceRepository(private val db: AppDatabase) {
         longitude: Double?,
         accuracy: Float?,
         isMockLocation: Boolean,
-        selfieData: String,
+        selfieData: String? = null,
         deviceId: String
     ): Result<AttendanceEntity> {
         val activeShift = attendanceDao.getAnyActiveShift(employee.employeeId)

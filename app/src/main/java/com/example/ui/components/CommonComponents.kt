@@ -41,12 +41,24 @@ fun ArtifyTopHeader(
     role: String,
     onLogoutClick: () -> Unit,
     notificationCount: Int = 0,
-    onNotificationClick: () -> Unit = {}
+    onNotificationClick: () -> Unit = {},
+    onThemeClick: (() -> Unit)? = null
 ) {
+    val isDark = LocalIsDarkTheme.current
+    val themePrefs = LocalThemePreferences.current
+    var showThemeDialog by remember { mutableStateOf(false) }
+
+    if (showThemeDialog && themePrefs != null) {
+        ThemeSettingsDialog(
+            themePreferences = themePrefs,
+            onDismiss = { showThemeDialog = false }
+        )
+    }
+
     val roleColor = when (role) {
-        UserRole.SUPERVISOR.name -> SophisticatedWarning
-        UserRole.STAFF.name -> SophisticatedSecondary
-        else -> SophisticatedPrimary
+        UserRole.SUPERVISOR.name -> if (isDark) SophisticatedWarning else SophisticatedLightWarning
+        UserRole.STAFF.name -> MaterialTheme.colorScheme.secondary
+        else -> MaterialTheme.colorScheme.primary
     }
 
     val initials = userName.split(" ")
@@ -58,7 +70,7 @@ fun ArtifyTopHeader(
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = SophisticatedDarkBg,
+        color = MaterialTheme.colorScheme.background,
         tonalElevation = 0.dp
     ) {
         Column(
@@ -75,7 +87,7 @@ fun ArtifyTopHeader(
                 Column {
                     Text(
                         text = "ARTIFY WORKFORCE",
-                        color = SophisticatedPrimary,
+                        color = MaterialTheme.colorScheme.primary,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold,
                         letterSpacing = 1.5.sp
@@ -83,7 +95,7 @@ fun ArtifyTopHeader(
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = "Good Day, $userName",
-                        color = SophisticatedTextPrimary,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 20.sp
                     )
@@ -93,6 +105,24 @@ fun ArtifyTopHeader(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
+                    // Theme Quick Mode Button
+                    IconButton(
+                        onClick = {
+                            if (onThemeClick != null) {
+                                onThemeClick()
+                            } else if (themePrefs != null) {
+                                showThemeDialog = true
+                            }
+                        },
+                        modifier = Modifier.testTag("header_theme_toggle_btn")
+                    ) {
+                        Icon(
+                            imageVector = if (isDark) Icons.Outlined.LightMode else Icons.Outlined.DarkMode,
+                            contentDescription = "Toggle Theme Mode",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
                     IconButton(
                         onClick = onNotificationClick,
                         modifier = Modifier.testTag("notification_button")
@@ -101,8 +131,8 @@ fun ArtifyTopHeader(
                             badge = {
                                 if (notificationCount > 0) {
                                     Badge(
-                                        containerColor = SophisticatedError,
-                                        contentColor = Color(0xFF601410)
+                                        containerColor = MaterialTheme.colorScheme.error,
+                                        contentColor = MaterialTheme.colorScheme.onError
                                     ) {
                                         Text(notificationCount.toString())
                                     }
@@ -112,7 +142,7 @@ fun ArtifyTopHeader(
                             Icon(
                                 imageVector = Icons.Outlined.Notifications,
                                 contentDescription = "Notifications",
-                                tint = SophisticatedTextSecondary
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -122,13 +152,13 @@ fun ArtifyTopHeader(
                         modifier = Modifier
                             .size(38.dp)
                             .clip(CircleShape)
-                            .background(SophisticatedDarkBorder)
-                            .border(2.dp, SophisticatedPrimary, CircleShape),
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = initials,
-                            color = SophisticatedTextPrimary,
+                            color = MaterialTheme.colorScheme.onSurface,
                             fontWeight = FontWeight.Bold,
                             fontSize = 13.sp
                         )
@@ -141,7 +171,7 @@ fun ArtifyTopHeader(
                         Icon(
                             imageVector = Icons.Default.ExitToApp,
                             contentDescription = "Logout",
-                            tint = SophisticatedTextMuted
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                         )
                     }
                 }
@@ -161,12 +191,12 @@ fun ArtifyTopHeader(
                 ) {
                     Surface(
                         shape = RoundedCornerShape(50),
-                        color = SophisticatedBadgeBg,
-                        border = androidx.compose.foundation.BorderStroke(1.dp, SophisticatedDarkBorder)
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                     ) {
                         Text(
                             text = "ID: $employeeId",
-                            color = SophisticatedTextSecondary,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Medium,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
@@ -190,8 +220,11 @@ fun ArtifyTopHeader(
 
                 Surface(
                     shape = RoundedCornerShape(50),
-                    color = SophisticatedSuccessContainer,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, SophisticatedSuccessBorder)
+                    color = (if (isDark) SophisticatedSuccess else SophisticatedLightSuccess).copy(alpha = 0.12f),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        (if (isDark) SophisticatedSuccess else SophisticatedLightSuccess).copy(alpha = 0.35f)
+                    )
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
@@ -201,12 +234,12 @@ fun ArtifyTopHeader(
                             modifier = Modifier
                                 .size(6.dp)
                                 .clip(CircleShape)
-                                .background(SophisticatedSuccess)
+                                .background(if (isDark) SophisticatedSuccess else SophisticatedLightSuccess)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = "SERVER AUTHORITATIVE",
-                            color = SophisticatedSuccess,
+                            color = if (isDark) SophisticatedSuccess else SophisticatedLightSuccess,
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 0.5.sp
@@ -229,6 +262,7 @@ fun GeofenceRadarCard(
     onRefreshLocation: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val isDark = LocalIsDarkTheme.current
     val isInside = geofenceResult?.isInside == true && geofenceResult.isAccuracyAcceptable && !isMockLocation
 
     Card(
@@ -237,9 +271,9 @@ fun GeofenceRadarCard(
             .testTag("geofence_card"),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(
-            containerColor = SophisticatedDarkSurface
+            containerColor = MaterialTheme.colorScheme.surface
         ),
-        border = androidx.compose.foundation.BorderStroke(1.dp, SophisticatedDarkBorder),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
@@ -251,7 +285,7 @@ fun GeofenceRadarCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "CURRENT PROJECT",
-                        color = SophisticatedTextSecondary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold,
                         letterSpacing = 1.2.sp
@@ -259,7 +293,7 @@ fun GeofenceRadarCard(
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = project?.projectName ?: "Loading Project...",
-                        color = SophisticatedTextPrimary,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Medium,
                         fontSize = 18.sp,
                         maxLines = 1,
@@ -267,15 +301,18 @@ fun GeofenceRadarCard(
                     )
                     Text(
                         text = project?.address ?: "",
-                        color = SophisticatedTextMuted,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                         fontSize = 12.sp
                     )
                 }
 
                 Surface(
                     shape = RoundedCornerShape(50),
-                    color = SophisticatedBadgeBg,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, SophisticatedDarkBorder)
+                    color = (if (isDark) SophisticatedSuccessContainer else SophisticatedLightSuccessContainer),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        if (isDark) SophisticatedSuccessBorder else SophisticatedLightSuccessBorder
+                    )
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
@@ -285,12 +322,12 @@ fun GeofenceRadarCard(
                             modifier = Modifier
                                 .size(6.dp)
                                 .clip(CircleShape)
-                                .background(SophisticatedSuccess)
+                                .background(if (isDark) SophisticatedSuccess else SophisticatedLightSuccess)
                         )
                         Spacer(modifier = Modifier.width(5.dp))
                         Text(
                             text = "ACTIVE",
-                            color = SophisticatedSuccess,
+                            color = if (isDark) SophisticatedSuccess else SophisticatedLightSuccess,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 0.5.sp
@@ -301,12 +338,12 @@ fun GeofenceRadarCard(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Location Verified Status Inset Card matching HTML
+            // Location Verified Status Inset Card
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(18.dp),
-                color = SophisticatedDarkBg.copy(alpha = 0.6f),
-                border = androidx.compose.foundation.BorderStroke(1.dp, SophisticatedDarkBorder.copy(alpha = 0.6f))
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
             ) {
                 Row(
                     modifier = Modifier.padding(14.dp),
@@ -318,13 +355,13 @@ fun GeofenceRadarCard(
                             modifier = Modifier
                                 .size(40.dp)
                                 .clip(CircleShape)
-                                .background(if (isInside) SophisticatedPrimaryContainer else SophisticatedErrorContainer),
+                                .background(if (isInside) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = if (isInside) Icons.Default.LocationOn else Icons.Default.LocationOff,
                                 contentDescription = "Location Pin",
-                                tint = if (isInside) SophisticatedPrimary else SophisticatedError,
+                                tint = if (isInside) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
                                 modifier = Modifier.size(22.dp)
                             )
                         }
@@ -332,7 +369,7 @@ fun GeofenceRadarCard(
                         Column {
                             Text(
                                 text = if (isInside) "✓ On-Site Verified" else "⚡ Off-Site • Head Office Notified",
-                                color = if (isInside) SophisticatedSuccess else Color(0xFFFFB74D),
+                                color = if (isInside) (if (isDark) SophisticatedSuccess else SophisticatedLightSuccess) else (if (isDark) SophisticatedWarning else SophisticatedLightWarning),
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 13.sp
                             )
@@ -341,7 +378,7 @@ fun GeofenceRadarCard(
                                     "Inside ${project?.geofenceRadiusMeters?.toInt() ?: 150}m Project Boundary • Head Office Payroll Synced"
                                 else
                                     "${geofenceResult?.distanceMeters?.toInt() ?: 0}m from boundary • Logged for Head Office Payroll review",
-                                color = SophisticatedTextSecondary,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 11.sp
                             )
                         }
@@ -354,7 +391,7 @@ fun GeofenceRadarCard(
                         Icon(
                             imageVector = Icons.Default.Refresh,
                             contentDescription = "Refresh GPS Location",
-                            tint = SophisticatedPrimary
+                            tint = MaterialTheme.colorScheme.primary
                         )
                     }
                 }
@@ -368,8 +405,8 @@ fun GeofenceRadarCard(
                     .fillMaxWidth()
                     .height(115.dp)
                     .clip(RoundedCornerShape(16.dp))
-                    .background(SophisticatedDarkBg)
-                    .border(1.dp, SophisticatedDarkBorder, RoundedCornerShape(16.dp)),
+                    .background(if (isDark) SophisticatedDarkBg else SophisticatedLightBg)
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), RoundedCornerShape(16.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 val infiniteTransition = rememberInfiniteTransition(label = "radar")
@@ -383,18 +420,21 @@ fun GeofenceRadarCard(
                     label = "pulse"
                 )
 
+                val radarGridColor = if (isDark) Color(0xFF333038) else Color(0xFFE2E6EC)
+                val radarGridInnerColor = if (isDark) Color(0xFF26242B) else Color(0xFFECEFF4)
+
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     val center = Offset(size.width / 2, size.height / 2)
 
                     // Background grid circles
                     drawCircle(
-                        color = Color(0xFF333038),
+                        color = radarGridColor,
                         radius = 80f,
                         center = center,
                         style = Stroke(width = 1.5f)
                     )
                     drawCircle(
-                        color = Color(0xFF26242B),
+                        color = radarGridInnerColor,
                         radius = 45f,
                         center = center,
                         style = Stroke(width = 1.5f)
@@ -415,7 +455,7 @@ fun GeofenceRadarCard(
 
                     // Animated scanning pulse
                     drawCircle(
-                        color = if (isInside) SophisticatedSuccess.copy(alpha = 0.3f) else SophisticatedError.copy(alpha = 0.3f),
+                        color = if (isInside) (if (isDark) SophisticatedSuccess else SophisticatedLightSuccess).copy(alpha = 0.3f) else (if (isDark) SophisticatedError else SophisticatedLightError).copy(alpha = 0.3f),
                         radius = pulseRadius,
                         center = center,
                         style = Stroke(width = 1.5f)
@@ -436,7 +476,7 @@ fun GeofenceRadarCard(
                     }
 
                     drawCircle(
-                        color = if (isInside) SophisticatedSuccess else SophisticatedError,
+                        color = if (isInside) (if (isDark) SophisticatedSuccess else SophisticatedLightSuccess) else (if (isDark) SophisticatedError else SophisticatedLightError),
                         radius = 7f,
                         center = userOffset
                     )
@@ -450,13 +490,13 @@ fun GeofenceRadarCard(
                 ) {
                     Text(
                         text = "Radius: ${project?.geofenceRadiusMeters?.toInt() ?: 150}m",
-                        color = SophisticatedTextSecondary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Medium
                     )
                     Text(
                         text = "GPS: ${String.format("%.4f", latitude)}, ${String.format("%.4f", longitude)} (±${accuracy.toInt()}m)",
-                        color = SophisticatedTextMuted,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                         fontSize = 9.sp
                     )
                 }
@@ -467,15 +507,15 @@ fun GeofenceRadarCard(
                         .align(Alignment.TopEnd)
                         .padding(8.dp),
                     shape = RoundedCornerShape(50),
-                    color = if (isInside) SophisticatedSuccessContainer else Color(0xFF3E2723),
+                    color = if (isInside) (if (isDark) SophisticatedSuccessContainer else SophisticatedLightSuccessContainer) else (if (isDark) SophisticatedWarningContainer else SophisticatedLightWarningContainer),
                     border = androidx.compose.foundation.BorderStroke(
                         1.dp,
-                        if (isInside) SophisticatedSuccessBorder else Color(0xFFFFB74D).copy(alpha = 0.5f)
+                        if (isInside) (if (isDark) SophisticatedSuccessBorder else SophisticatedLightSuccessBorder) else (if (isDark) SophisticatedWarning else SophisticatedLightWarning).copy(alpha = 0.4f)
                     )
                 ) {
                     Text(
                         text = if (isInside) "On-Site (${dist}m)" else "Off-Site (${dist}m) • Payroll Logged",
-                        color = if (isInside) SophisticatedSuccess else Color(0xFFFFB74D),
+                        color = if (isInside) (if (isDark) SophisticatedSuccess else SophisticatedLightSuccess) else (if (isDark) SophisticatedWarning else SophisticatedLightWarning),
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
@@ -503,41 +543,42 @@ fun SelfieCaptureDialog(
 
 @Composable
 fun AttendanceStatusBadge(state: String) {
+    val isDark = LocalIsDarkTheme.current
     val (bg, fg, border, label) = when (state) {
         AttendanceState.APPROVED.name -> Quadruple(
-            SophisticatedSuccessContainer,
-            SophisticatedSuccess,
-            SophisticatedSuccessBorder,
+            if (isDark) SophisticatedSuccessContainer else SophisticatedLightSuccessContainer,
+            if (isDark) SophisticatedSuccess else SophisticatedLightSuccess,
+            if (isDark) SophisticatedSuccessBorder else SophisticatedLightSuccessBorder,
             "Approved"
         )
         AttendanceState.PENDING_APPROVAL.name -> Quadruple(
-            SophisticatedWarningContainer,
-            SophisticatedWarning,
-            SophisticatedWarning.copy(alpha = 0.4f),
+            if (isDark) SophisticatedWarningContainer else SophisticatedLightWarningContainer,
+            if (isDark) SophisticatedWarning else SophisticatedLightWarning,
+            (if (isDark) SophisticatedWarning else SophisticatedLightWarning).copy(alpha = 0.4f),
             "Pending Approval"
         )
         AttendanceState.REJECTED.name -> Quadruple(
-            SophisticatedErrorContainer,
-            SophisticatedError,
-            SophisticatedError.copy(alpha = 0.4f),
+            MaterialTheme.colorScheme.errorContainer,
+            MaterialTheme.colorScheme.error,
+            MaterialTheme.colorScheme.error.copy(alpha = 0.4f),
             "Rejected"
         )
         AttendanceState.FLAGGED.name -> Quadruple(
-            SophisticatedErrorContainer,
-            SophisticatedWarning,
-            SophisticatedWarning.copy(alpha = 0.4f),
+            MaterialTheme.colorScheme.errorContainer,
+            if (isDark) SophisticatedWarning else SophisticatedLightWarning,
+            (if (isDark) SophisticatedWarning else SophisticatedLightWarning).copy(alpha = 0.4f),
             "Flagged"
         )
         AttendanceState.SUBMITTED.name -> Quadruple(
-            SophisticatedPrimaryContainer,
-            SophisticatedPrimary,
-            SophisticatedPrimary.copy(alpha = 0.4f),
+            MaterialTheme.colorScheme.primaryContainer,
+            MaterialTheme.colorScheme.primary,
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
             "Submitted"
         )
         else -> Quadruple(
-            SophisticatedBadgeBg,
-            SophisticatedTextSecondary,
-            SophisticatedDarkBorder,
+            MaterialTheme.colorScheme.surfaceVariant,
+            MaterialTheme.colorScheme.onSurfaceVariant,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
             state
         )
     }

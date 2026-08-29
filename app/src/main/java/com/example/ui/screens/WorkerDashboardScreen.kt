@@ -255,12 +255,12 @@ fun WorkerDashboardScreen(
         }
 
         if (uiState.showEndShiftDialog) {
-            CameraXSelfieDialog(
-                eventType = ShiftEventType.END_SHIFT,
+            EndShiftConfirmDialog(
+                activeShift = uiState.activeShift,
                 projectName = uiState.assignedProject?.projectName ?: "Project Site",
                 onDismiss = { workerViewModel.setEndShiftDialog(false) },
-                onCaptureComplete = { selfiePath ->
-                    workerViewModel.endShift(selfiePath)
+                onConfirm = {
+                    workerViewModel.endShift()
                 }
             )
         }
@@ -417,7 +417,7 @@ private fun ShiftDashboardTab(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
-                    // Inner Circular Camera Icon Badge
+                    // Inner Circular Icon Badge
                     Box(
                         contentAlignment = Alignment.Center,
                         modifier = Modifier
@@ -433,8 +433,8 @@ private fun ShiftDashboardTab(
                             )
                     ) {
                         Icon(
-                            imageVector = Icons.Default.CameraAlt,
-                            contentDescription = if (isShiftActive) "End Shift with Selfie" else "Start Shift with Selfie",
+                            imageVector = if (isShiftActive) Icons.Default.Logout else Icons.Default.CameraAlt,
+                            contentDescription = if (isShiftActive) "End Shift / Clock Out" else "Start Shift with Selfie",
                             tint = if (isShiftActive) SophisticatedError else SophisticatedPrimary,
                             modifier = Modifier.size(28.dp)
                         )
@@ -444,7 +444,7 @@ private fun ShiftDashboardTab(
 
                     // Action Title Text
                     Text(
-                        text = if (isShiftActive) "End Shift with Selfie" else "Start Shift with Selfie",
+                        text = if (isShiftActive) "End Shift / Clock Out" else "Start Shift with Selfie",
                         color = SophisticatedTextPrimary,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
@@ -456,7 +456,7 @@ private fun ShiftDashboardTab(
 
                     // Secondary helper text
                     Text(
-                        text = if (isShiftActive) "Tap to Clock Out" else "Tap to Clock In",
+                        text = if (isShiftActive) "Tap to Clock Out (Instant)" else "Tap to Clock In",
                         color = if (isShiftActive) SophisticatedError else SophisticatedSuccess,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.SemiBold,
@@ -1053,6 +1053,20 @@ private fun WorkerProfileTab(
     assignedProject: com.example.data.entity.ProjectEntity?,
     onLogoutClick: () -> Unit
 ) {
+    val isDark = LocalIsDarkTheme.current
+    val themePrefs = LocalThemePreferences.current
+    var showThemeDialog by remember { mutableStateOf(false) }
+
+    if (showThemeDialog && themePrefs != null) {
+        ThemeSettingsDialog(
+            themePreferences = themePrefs,
+            onDismiss = { showThemeDialog = false }
+        )
+    }
+
+    val themeSettings by (themePrefs?.settings?.collectAsState() ?: remember { mutableStateOf(ThemeSettings()) })
+    val themeMode = themeSettings.themeMode
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -1068,8 +1082,8 @@ private fun WorkerProfileTab(
                 .fillMaxWidth()
                 .testTag("profile_header_card"),
             shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = SophisticatedDarkSurface),
-            border = androidx.compose.foundation.BorderStroke(1.dp, SophisticatedDarkBorder)
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
         ) {
             Column(
                 modifier = Modifier
@@ -1086,10 +1100,10 @@ private fun WorkerProfileTab(
                             .clip(CircleShape)
                             .background(
                                 Brush.linearGradient(
-                                    listOf(SophisticatedPrimary, SophisticatedSecondary)
+                                    listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)
                                 )
                             )
-                            .border(2.dp, SophisticatedPrimary.copy(alpha = 0.6f), CircleShape)
+                            .border(2.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.6f), CircleShape)
                     ) {
                         val initials = currentUser?.fullName?.split(" ")
                             ?.mapNotNull { it.firstOrNull()?.toString() }
@@ -1097,7 +1111,7 @@ private fun WorkerProfileTab(
                             ?.joinToString("") ?: "AA"
                         Text(
                             text = initials,
-                            color = SophisticatedOnPrimary,
+                            color = MaterialTheme.colorScheme.onPrimary,
                             fontWeight = FontWeight.ExtraBold,
                             fontSize = 24.sp,
                             letterSpacing = 1.sp
@@ -1109,8 +1123,8 @@ private fun WorkerProfileTab(
                         modifier = Modifier
                             .size(18.dp)
                             .clip(CircleShape)
-                            .background(SophisticatedSuccess)
-                            .border(2.dp, SophisticatedDarkSurface, CircleShape)
+                            .background(if (isDark) SophisticatedSuccess else SophisticatedLightSuccess)
+                            .border(2.dp, MaterialTheme.colorScheme.surface, CircleShape)
                     )
                 }
 
@@ -1119,7 +1133,7 @@ private fun WorkerProfileTab(
                 // Full Name
                 Text(
                     text = currentUser?.fullName ?: "Ahmed Ali Al-Balushi",
-                    color = SophisticatedTextPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center
@@ -1130,8 +1144,8 @@ private fun WorkerProfileTab(
                 // Role Pill Badge
                 Surface(
                     shape = RoundedCornerShape(50),
-                    color = SophisticatedPrimaryContainer,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, SophisticatedPrimary.copy(alpha = 0.4f))
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
@@ -1141,12 +1155,12 @@ private fun WorkerProfileTab(
                             modifier = Modifier
                                 .size(6.dp)
                                 .clip(CircleShape)
-                                .background(SophisticatedPrimary)
+                                .background(MaterialTheme.colorScheme.primary)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = "${currentUser?.role ?: "WORKER"} • ${currentUser?.department ?: "Civil Team"}",
-                            color = SophisticatedPrimary,
+                            color = MaterialTheme.colorScheme.primary,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 0.5.sp
@@ -1158,9 +1172,143 @@ private fun WorkerProfileTab(
 
                 Text(
                     text = "ID: ${currentUser?.employeeId ?: "ART-W-000001"} • ${currentUser?.companyName ?: "Artify Contracting LLC"}",
-                    color = SophisticatedTextSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 12.sp
                 )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // --- Display & Environment Theme Settings Card ---
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("theme_settings_card"),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        ) {
+            Column(modifier = Modifier.padding(18.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "DISPLAY & ENVIRONMENT THEME",
+                        color = MaterialTheme.colorScheme.primary,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
+                    )
+
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = MaterialTheme.colorScheme.primaryContainer
+                    ) {
+                        Text(
+                            text = if (isDark) "DARK MODE" else "LIGHT MODE",
+                            color = MaterialTheme.colorScheme.primary,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Text(
+                    text = "High-contrast dynamic themes designed for bright daylight and night construction visibility.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 12.sp
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Persistent Dark Mode Switch Row
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = if (isDark) Icons.Default.DarkMode else Icons.Default.LightMode,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = "Dark Theme",
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    text = when (themeMode) {
+                                        ThemeMode.DARK -> "Always Dark (Battery & Night Shift)"
+                                        ThemeMode.LIGHT -> "Always Light (High Daylight Visibility)"
+                                        ThemeMode.SYSTEM -> "Following System Mode"
+                                    },
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+
+                        Switch(
+                            checked = isDark,
+                            onCheckedChange = { checked ->
+                                themePrefs?.setThemeMode(if (checked) ThemeMode.DARK else ThemeMode.LIGHT)
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = MaterialTheme.colorScheme.primary,
+                                checkedTrackColor = MaterialTheme.colorScheme.primaryContainer,
+                                uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+                                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                            ),
+                            modifier = Modifier.testTag("dark_mode_toggle_switch")
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Button to open Full Theme & Dynamic Color Settings
+                OutlinedButton(
+                    onClick = { showThemeDialog = true },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("customize_theme_btn"),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.primary
+                    ),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Palette,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Configure Dynamic Colors & System Themes",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
             }
         }
 
@@ -1170,8 +1318,8 @@ private fun WorkerProfileTab(
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = SophisticatedDarkSurface),
-            border = androidx.compose.foundation.BorderStroke(1.dp, SophisticatedDarkBorder)
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
         ) {
             Column(modifier = Modifier.padding(18.dp)) {
                 Row(
@@ -1181,19 +1329,22 @@ private fun WorkerProfileTab(
                 ) {
                     Text(
                         text = "WORK ASSIGNMENT",
-                        color = SophisticatedPrimary,
+                        color = MaterialTheme.colorScheme.primary,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 1.sp
                     )
                     Surface(
                         shape = RoundedCornerShape(50),
-                        color = SophisticatedSuccessContainer,
-                        border = androidx.compose.foundation.BorderStroke(1.dp, SophisticatedSuccessBorder)
+                        color = (if (isDark) SophisticatedSuccessContainer else SophisticatedLightSuccessContainer),
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            if (isDark) SophisticatedSuccessBorder else SophisticatedLightSuccessBorder
+                        )
                     ) {
                         Text(
                             text = "ACTIVE SITE",
-                            color = SophisticatedSuccess,
+                            color = if (isDark) SophisticatedSuccess else SophisticatedLightSuccess,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
@@ -1216,13 +1367,13 @@ private fun WorkerProfileTab(
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = SophisticatedDarkSurface),
-            border = androidx.compose.foundation.BorderStroke(1.dp, SophisticatedDarkBorder)
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
         ) {
             Column(modifier = Modifier.padding(18.dp)) {
                 Text(
                     text = "CONTACT & CREDENTIALS",
-                    color = SophisticatedSecondary,
+                    color = MaterialTheme.colorScheme.secondary,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.sp
@@ -1243,13 +1394,13 @@ private fun WorkerProfileTab(
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = SophisticatedDarkSurface),
-            border = androidx.compose.foundation.BorderStroke(1.dp, SophisticatedDarkBorder)
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
         ) {
             Column(modifier = Modifier.padding(18.dp)) {
                 Text(
                     text = "SECURITY & BIOMETRIC VERIFICATION",
-                    color = SophisticatedTextSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.sp
@@ -1274,9 +1425,9 @@ private fun WorkerProfileTab(
                 .testTag("profile_logout_btn"),
             shape = RoundedCornerShape(50),
             colors = ButtonDefaults.outlinedButtonColors(
-                contentColor = SophisticatedError
+                contentColor = MaterialTheme.colorScheme.error
             ),
-            border = androidx.compose.foundation.BorderStroke(1.dp, SophisticatedError.copy(alpha = 0.6f))
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.6f))
         ) {
             Icon(
                 imageVector = Icons.Default.Logout,
@@ -1711,3 +1862,189 @@ private fun NotificationsDialog(
         }
     }
 }
+
+@Composable
+fun EndShiftConfirmDialog(
+    activeShift: AttendanceEntity?,
+    projectName: String,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(24.dp),
+            color = SophisticatedDarkSurface,
+            border = BorderStroke(1.dp, SophisticatedDarkBorder),
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("end_shift_confirm_dialog")
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Header Icon
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(60.dp)
+                        .clip(CircleShape)
+                        .background(SophisticatedErrorContainer)
+                        .border(1.dp, SophisticatedError.copy(alpha = 0.5f), CircleShape)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Logout,
+                        contentDescription = "Clock Out",
+                        tint = SophisticatedError,
+                        modifier = Modifier.size(30.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = "Clock Out Shift",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = SophisticatedTextPrimary,
+                    textAlign = TextAlign.Center
+                )
+
+                Text(
+                    text = "Complete shift & sync hours with Head Office Payroll",
+                    fontSize = 12.sp,
+                    color = SophisticatedTextSecondary,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(18.dp))
+
+                // Shift Details Summary Card
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    color = SophisticatedDarkBg,
+                    border = BorderStroke(1.dp, SophisticatedDarkBorder)
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Project Site",
+                                fontSize = 11.sp,
+                                color = SophisticatedTextSecondary
+                            )
+                            Text(
+                                text = projectName,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = SophisticatedTextPrimary
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+                        HorizontalDivider(color = SophisticatedDarkBorderLight.copy(alpha = 0.3f))
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Started At",
+                                fontSize = 11.sp,
+                                color = SophisticatedTextSecondary
+                            )
+                            Text(
+                                text = activeShift?.startTimeFormatted ?: "Active",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = SophisticatedTextPrimary
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+                        HorizontalDivider(color = SophisticatedDarkBorderLight.copy(alpha = 0.3f))
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Selfie Verification",
+                                fontSize = 11.sp,
+                                color = SophisticatedTextSecondary
+                            )
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = SophisticatedSuccessContainer,
+                                border = BorderStroke(0.5.dp, SophisticatedSuccess.copy(alpha = 0.4f))
+                            ) {
+                                Text(
+                                    text = "Not Required for Clock-Out",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = SophisticatedSuccess,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Action Buttons
+                Button(
+                    onClick = {
+                        onConfirm()
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .testTag("confirm_clock_out_btn"),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = SophisticatedError,
+                        contentColor = Color.White
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Confirm & Clock Out",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedButton(
+                    onClick = onDismiss,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(44.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(1.dp, SophisticatedDarkBorderLight),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = SophisticatedTextSecondary
+                    )
+                ) {
+                    Text("Cancel / Keep Working", fontSize = 13.sp)
+                }
+            }
+        }
+    }
+}
+

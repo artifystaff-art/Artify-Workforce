@@ -56,6 +56,10 @@ class AuthViewModel(private val repository: WorkforceRepository) : ViewModel() {
         login(email, "password123")
     }
 
+    fun quickLoginAsEmail(email: String) {
+        login(email, "password123")
+    }
+
     fun register(
         fullName: String,
         email: String,
