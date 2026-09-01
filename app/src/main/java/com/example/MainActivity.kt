@@ -57,6 +57,7 @@ class MainActivity : ComponentActivity() {
             ArtifyTheme(
                 themeMode = themeSettings.themeMode,
                 dynamicColor = themeSettings.dynamicColor,
+                accentPalette = themeSettings.accentPalette,
                 themePreferences = themePreferences
             ) {
                 Surface(

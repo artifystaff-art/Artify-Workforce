@@ -61,6 +61,7 @@ object NtpTimeService {
     )
 
     enum class TimeSyncMethod(val displayName: String) {
+        FIRESTORE_SERVER_TIMESTAMP("Firebase Firestore Server Timestamp"),
         SNTP_UDP("Authoritative SNTP (UDP)"),
         HTTP_HEADER("Cloud HTTP Server Time"),
         SYSTEM_FALLBACK("Local Monotonic Fallback"),
@@ -85,6 +86,30 @@ object NtpTimeService {
                 delay(15 * 60 * 1000L)
             }
         }
+    }
+
+    /**
+     * Updates the authoritative time state using a verified Firebase Firestore server timestamp.
+     */
+    fun updateWithFirestoreServerTime(serverTimestampMs: Long, roundTripLatencyMs: Long = 0L): NtpSyncState {
+        val elapsedTicks = SystemClock.elapsedRealtime()
+        val drift = System.currentTimeMillis() - serverTimestampMs
+        val isTampered = abs(drift) > MAX_ALLOWED_CLOCK_DRIFT_MS
+
+        val newState = NtpSyncState(
+            isSynchronized = true,
+            serverTimeAtSyncMs = serverTimestampMs,
+            elapsedRealtimeAtSyncMs = elapsedTicks,
+            roundTripLatencyMs = roundTripLatencyMs,
+            serverUsed = "Firebase Firestore (Cloud Timestamp)",
+            lastSyncTimestamp = System.currentTimeMillis(),
+            isDeviceTimeTampered = isTampered,
+            detectedDriftMs = drift,
+            syncMethod = TimeSyncMethod.FIRESTORE_SERVER_TIMESTAMP
+        )
+        _syncState.value = newState
+        Log.i(TAG, "Updated authoritative time state from Firestore server timestamp: ${serverTimestampMs}ms (drift: ${drift}ms)")
+        return newState
     }
 
     /**

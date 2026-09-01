@@ -1,14 +1,24 @@
 package com.example.data.repository
 
 import android.content.Context
+import android.os.SystemClock
+import android.util.Log
 import com.example.data.AppDatabase
 import com.example.data.entity.*
 import com.example.model.*
 import com.example.notifications.FcmNotificationManager
 import com.example.server.LocationUtils
+import com.example.server.NtpTimeService
 import com.example.server.ServerAuthorityEngine
+import com.example.server.ServerTimestampResult
 import com.example.sync.FirestoreSyncManager
+import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 import java.util.UUID
 
 class WorkforceRepository(
@@ -439,6 +449,31 @@ class WorkforceRepository(
     suspend fun getUserByEmployeeId(employeeId: String): UserEntity? =
         userDao.getUserByEmployeeId(employeeId)
 
+    suspend fun updateUserProfilePicture(employeeId: String, avatarUrlOrPath: String): Result<UserEntity> {
+        val user = userDao.getUserByEmployeeId(employeeId)
+            ?: return Result.failure(Exception("Employee $employeeId not found."))
+
+        val updatedUser = user.copy(avatarUrl = avatarUrlOrPath)
+        userDao.insertUser(updatedUser)
+
+        val serverTime = ServerAuthorityEngine.getServerTimestamp()
+        auditDao.insertAuditLog(
+            AuditLogEntity(
+                auditId = "AUD-PIC-" + UUID.randomUUID().toString().take(8),
+                actorId = employeeId,
+                actorName = user.fullName,
+                actorRole = user.role,
+                action = AuditAction.PROFILE_UPDATED.name,
+                entityType = "USER",
+                entityId = employeeId,
+                serverTimestampUtc = serverTime.timestampUtc,
+                details = "Updated profile picture using device camera capture."
+            )
+        )
+
+        return Result.success(updatedUser)
+    }
+
     fun getAllUsers(): Flow<List<UserEntity>> = userDao.getAllUsers()
     fun getUsersByRole(role: String): Flow<List<UserEntity>> = userDao.getUsersByRole(role)
 
@@ -469,6 +504,7 @@ class WorkforceRepository(
         }
 
         // 2. Authoritative Geofence Validation (Google Location Services & Server Engine)
+        // Geofence data is evaluated to log location & distance for Head Office HR honesty review
         val geofenceResult = ServerAuthorityEngine.evaluateGeofence(
             latitude = latitude,
             longitude = longitude,
@@ -477,29 +513,7 @@ class WorkforceRepository(
             project = project
         )
 
-        // Strict Geofence Check: Restrict clock-ins and block submissions from outside the designated work site radius
-        if (latitude == null || longitude == null) {
-            return Result.failure(
-                IllegalStateException("Clock-In Blocked: Location services are required. Please enable GPS to verify you are on site at ${project.projectName}.")
-            )
-        }
-
-        if (isMockLocation) {
-            return Result.failure(
-                IllegalStateException("Clock-In Blocked: Mock/Spoofed location detected. Clock-in is prohibited using simulated coordinates.")
-            )
-        }
-
-        if (!geofenceResult.isInside || geofenceResult.status == GeofenceStatus.OUTSIDE_GEOFENCE) {
-            val dist = geofenceResult.distanceMeters.toInt()
-            val radius = project.geofenceRadiusMeters.toInt()
-            val excess = (geofenceResult.distanceMeters - project.geofenceRadiusMeters).toInt()
-            return Result.failure(
-                IllegalStateException("Clock-In Blocked: You are outside the designated work site perimeter. You are currently ${dist}m away from ${project.projectName} (${excess}m outside allowed ${radius}m radius).")
-            )
-        }
-
-        val verificationStatus = if (geofenceResult.isInside && geofenceResult.isAccuracyAcceptable) {
+        val verificationStatus = if (geofenceResult.isInside && geofenceResult.isAccuracyAcceptable && !isMockLocation) {
             VerificationStatus.VERIFIED
         } else {
             VerificationStatus.FLAGGED
@@ -718,6 +732,17 @@ class WorkforceRepository(
             )
         )
 
+        // Dispatch Automated FCM Push Notification
+        context?.let { ctx ->
+            FcmNotificationManager.dispatchAttendanceApprovalPushNotification(
+                context = ctx,
+                attendance = approvedRecord,
+                supervisor = supervisor,
+                isApproved = true,
+                commentOrReason = comment
+            )
+        }
+
         return Result.success(approvedRecord)
     }
 
@@ -776,6 +801,17 @@ class WorkforceRepository(
             )
         )
 
+        // Dispatch Automated FCM Push Notification
+        context?.let { ctx ->
+            FcmNotificationManager.dispatchAttendanceApprovalPushNotification(
+                context = ctx,
+                attendance = rejectedRecord,
+                supervisor = supervisor,
+                isApproved = false,
+                commentOrReason = rejectionReason
+            )
+        }
+
         return Result.success(rejectedRecord)
     }
 
@@ -830,17 +866,30 @@ class WorkforceRepository(
             )
         )
 
-        // Notify Supervisors
+        // Notify Supervisors (Local DB + FCM Push Alert)
         notificationDao.insertNotification(
             NotificationEntity(
                 notificationId = "NOTIF-LV-" + UUID.randomUUID().toString().take(8),
                 recipientId = "ALL_SUPERVISORS",
                 title = "New Leave Request Submitted",
                 message = "${employee.fullName} requested ${type.displayName} ($totalDays days: $startDate to $endDate).",
-                type = "LEAVE",
+                type = "LEAVE_REQUEST",
                 timestampUtc = serverTime.timestampUtc
             )
         )
+
+        // Dispatch Automated FCM Push Notification to Supervisors
+        try {
+            context?.let { ctx ->
+                FcmNotificationManager.dispatchNewLeaveRequestAlertToSupervisors(
+                    context = ctx,
+                    leave = leaveRequest,
+                    employee = employee
+                )
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("WorkforceRepo", "Failed to trigger supervisor FCM leave alert: ${e.message}")
+        }
 
         return Result.success(leaveRequest)
     }

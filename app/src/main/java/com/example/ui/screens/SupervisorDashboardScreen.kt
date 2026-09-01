@@ -52,6 +52,7 @@ fun SupervisorDashboardScreen(
     var showRejectDialogForLeave by remember { mutableStateOf<String?>(null) }
     var approveComment by remember { mutableStateOf("") }
     var showApproveCommentDialogForAttendance by remember { mutableStateOf<String?>(null) }
+    var showExportPdfDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -60,6 +61,7 @@ fun SupervisorDashboardScreen(
                 userName = uiState.supervisorUser?.fullName ?: "Supervisor",
                 employeeId = uiState.supervisorUser?.employeeId ?: "SUP-01",
                 role = "SUPERVISOR",
+                avatarUrl = uiState.supervisorUser?.avatarUrl,
                 onLogoutClick = onLogoutClick,
                 notificationCount = uiState.pendingApprovals.size
             )
@@ -187,7 +189,8 @@ fun SupervisorDashboardScreen(
                         )
                         1 -> AttendanceRosterView(
                             allAttendance = uiState.allAttendance,
-                            onInspect = { supervisorViewModel.selectAttendanceForReview(it) }
+                            onInspect = { supervisorViewModel.selectAttendanceForReview(it) },
+                            onExportPdf = { showExportPdfDialog = true }
                         )
                         2 -> LeaveApprovalView(
                             pendingLeaves = uiState.pendingLeaveRequests,
@@ -309,6 +312,15 @@ fun SupervisorDashboardScreen(
                     supervisorViewModel.rejectLeave(leaveId, reason)
                     showRejectDialogForLeave = null
                 }
+            )
+        }
+
+        if (showExportPdfDialog) {
+            ExportAttendancePdfDialog(
+                attendanceList = uiState.allAttendance,
+                projects = uiState.allProjects,
+                supervisorUser = uiState.supervisorUser,
+                onDismiss = { showExportPdfDialog = false }
             )
         }
     }
@@ -540,7 +552,8 @@ private fun PendingApprovalsView(
 @Composable
 private fun AttendanceRosterView(
     allAttendance: List<AttendanceEntity>,
-    onInspect: (AttendanceEntity) -> Unit
+    onInspect: (AttendanceEntity) -> Unit,
+    onExportPdf: () -> Unit = {}
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var selectedFilter by remember { mutableStateOf("ALL") }
@@ -557,12 +570,44 @@ private fun AttendanceRosterView(
             .fillMaxSize()
             .padding(16.dp)
     ) {
-        Text(
-            text = "Workforce Attendance Roster",
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Bold,
-            color = SophisticatedTextPrimary
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Workforce Attendance Roster",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = SophisticatedTextPrimary
+                )
+                Text(
+                    text = "${allAttendance.size} records logged",
+                    fontSize = 11.sp,
+                    color = SophisticatedTextSecondary
+                )
+            }
+
+            Button(
+                onClick = onExportPdf,
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = SophisticatedPrimary,
+                    contentColor = SophisticatedOnPrimary
+                ),
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                modifier = Modifier.testTag("export_pdf_button")
+            ) {
+                Icon(
+                    imageVector = Icons.Default.PictureAsPdf,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Export PDF", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            }
+        }
         Spacer(modifier = Modifier.height(10.dp))
 
         OutlinedTextField(

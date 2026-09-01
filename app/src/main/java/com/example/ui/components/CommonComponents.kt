@@ -21,6 +21,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -28,6 +29,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import coil.compose.AsyncImage
 import com.example.data.entity.ProjectEntity
 import com.example.model.*
 import com.example.server.ServerAuthorityEngine
@@ -40,6 +42,8 @@ fun ArtifyTopHeader(
     employeeId: String,
     role: String,
     onLogoutClick: () -> Unit,
+    avatarUrl: String? = null,
+    onAvatarClick: (() -> Unit)? = null,
     notificationCount: Int = 0,
     onNotificationClick: () -> Unit = {},
     onThemeClick: (() -> Unit)? = null
@@ -60,13 +64,6 @@ fun ArtifyTopHeader(
         UserRole.STAFF.name -> MaterialTheme.colorScheme.secondary
         else -> MaterialTheme.colorScheme.primary
     }
-
-    val initials = userName.split(" ")
-        .filter { it.isNotBlank() }
-        .take(2)
-        .map { it.first().uppercase() }
-        .joinToString("")
-        .ifEmpty { "AW" }
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -145,23 +142,6 @@ fun ArtifyTopHeader(
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                    }
-
-                    // Avatar Circle matching theme
-                    Box(
-                        modifier = Modifier
-                            .size(38.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                            .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = initials,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp
-                        )
                     }
 
                     IconButton(

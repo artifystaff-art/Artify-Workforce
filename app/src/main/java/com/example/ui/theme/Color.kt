@@ -3,84 +3,84 @@ package com.example.ui.theme
 import androidx.compose.ui.graphics.Color
 
 // ==========================================
-// Sophisticated Dark Core Theme Colors
+// Modern Cobalt Enterprise Dark Theme Colors
 // ==========================================
-val SophisticatedDarkBg = Color(0xFF141316)
-val SophisticatedDarkSurface = Color(0xFF211F26)
-val SophisticatedDarkSurfaceHigh = Color(0xFF2E2B35)
-val SophisticatedDarkNav = Color(0xFF19181D)
-val SophisticatedDarkBorder = Color(0xFF49454F)
-val SophisticatedDarkBorderLight = Color(0xFF5E5A64)
+val SophisticatedDarkBg = Color(0xFF0F172A)          // Slate 900 / Deep Obsidian Slate
+val SophisticatedDarkSurface = Color(0xFF1E293B)     // Slate 800
+val SophisticatedDarkSurfaceHigh = Color(0xFF334155) // Slate 700
+val SophisticatedDarkNav = Color(0xFF0F172A)
+val SophisticatedDarkBorder = Color(0xFF334155)      // Slate 700 border
+val SophisticatedDarkBorderLight = Color(0xFF475569) // Slate 600
 
-val SophisticatedPrimary = Color(0xFFD0BCFF)
-val SophisticatedOnPrimary = Color(0xFF381E72)
-val SophisticatedPrimaryContainer = Color(0xFF4F378B)
-val SophisticatedOnPrimaryContainer = Color(0xFFEADDFF)
-val SophisticatedSecondary = Color(0xFFCCC2DC)
-val SophisticatedTertiary = Color(0xFFEFB8C8)
+val SophisticatedPrimary = Color(0xFF60A5FA)          // Electric Cobalt 400 (High contrast in Dark)
+val SophisticatedOnPrimary = Color(0xFF0F172A)
+val SophisticatedPrimaryContainer = Color(0xFF1E3A8A) // Cobalt 900
+val SophisticatedOnPrimaryContainer = Color(0xFFDBEAFE) // Cobalt 100
+val SophisticatedSecondary = Color(0xFF94A3B8)        // Slate 400
+val SophisticatedTertiary = Color(0xFF38BDF8)         // Cyan Sky 400
 
-val SophisticatedTextPrimary = Color(0xFFE6E1E5)
-val SophisticatedTextSecondary = Color(0xFFCAC4D0)
-val SophisticatedTextMuted = Color(0xFF938F99)
+val SophisticatedTextPrimary = Color(0xFFF8FAFC)      // Slate 50
+val SophisticatedTextSecondary = Color(0xFFCBD5E1)    // Slate 300
+val SophisticatedTextMuted = Color(0xFF94A3B8)        // Slate 400
 
-val SophisticatedSuccess = Color(0xFFB4E28B)
-val SophisticatedSuccessContainer = Color(0xFF1D2E1F)
-val SophisticatedSuccessBorder = Color(0x4DB4E28B)
+val SophisticatedSuccess = Color(0xFF34D399)          // Emerald 400
+val SophisticatedSuccessContainer = Color(0xFF064E3B) // Emerald 900
+val SophisticatedSuccessBorder = Color(0x4D34D399)
 
-val SophisticatedWarning = Color(0xFFFFBA38)
-val SophisticatedWarningContainer = Color(0xFF382500)
+val SophisticatedWarning = Color(0xFFFBBF24)          // Amber 400
+val SophisticatedWarningContainer = Color(0xFF78350F) // Amber 900
 
-val SophisticatedError = Color(0xFFF2B8B5)
-val SophisticatedErrorContainer = Color(0xFF601410)
+val SophisticatedError = Color(0xFFF87171)            // Rose Red 400
+val SophisticatedErrorContainer = Color(0xFF7F1D1D)   // Red 900
 
-val SophisticatedBadgeBg = Color(0xFF37393E)
+val SophisticatedBadgeBg = Color(0xFF1E293B)
 
 // ==========================================
-// Sophisticated Light Theme Colors (High Daylight / Outdoor Visibility)
+// Modern Cobalt Enterprise Light Theme Colors
 // ==========================================
-val SophisticatedLightBg = Color(0xFFF6F8FA)
-val SophisticatedLightSurface = Color(0xFFFFFFFF)
-val SophisticatedLightSurfaceHigh = Color(0xFFEEF2F6)
+val SophisticatedLightBg = Color(0xFFF8FAFC)          // Slate 50 clean ice canvas
+val SophisticatedLightSurface = Color(0xFFFFFFFF)     // Crisp Pure White
+val SophisticatedLightSurfaceHigh = Color(0xFFF1F5F9) // Slate 100
 val SophisticatedLightNav = Color(0xFFFFFFFF)
-val SophisticatedLightBorder = Color(0xFFD0D7DE)
-val SophisticatedLightBorderLight = Color(0xFFE1E4E8)
+val SophisticatedLightBorder = Color(0xFFE2E8F0)      // Slate 200
+val SophisticatedLightBorderLight = Color(0xFFCBD5E1) // Slate 300
 
-val SophisticatedLightPrimary = Color(0xFF6750A4)
+val SophisticatedLightPrimary = Color(0xFF2563EB)     // Vibrant Royal Cobalt 600
 val SophisticatedLightOnPrimary = Color(0xFFFFFFFF)
-val SophisticatedLightPrimaryContainer = Color(0xFFEADDFF)
-val SophisticatedLightOnPrimaryContainer = Color(0xFF21005D)
-val SophisticatedLightSecondary = Color(0xFF625B71)
-val SophisticatedLightTertiary = Color(0xFF7D5260)
+val SophisticatedLightPrimaryContainer = Color(0xFFDBEAFE) // Soft Blue 100
+val SophisticatedLightOnPrimaryContainer = Color(0xFF1E3A8A) // Deep Cobalt
+val SophisticatedLightSecondary = Color(0xFF475569)   // Slate 600
+val SophisticatedLightTertiary = Color(0xFF0284C7)    // Cyan 600
 
-val SophisticatedLightTextPrimary = Color(0xFF1C1B1F)
-val SophisticatedLightTextSecondary = Color(0xFF49454F)
-val SophisticatedLightTextMuted = Color(0xFF79747E)
+val SophisticatedLightTextPrimary = Color(0xFF0F172A) // Slate 900
+val SophisticatedLightTextSecondary = Color(0xFF475569) // Slate 600
+val SophisticatedLightTextMuted = Color(0xFF64748B)   // Slate 500
 
-val SophisticatedLightSuccess = Color(0xFF2E7D32)
-val SophisticatedLightSuccessContainer = Color(0xFFE8F5E9)
-val SophisticatedLightSuccessBorder = Color(0x662E7D32)
+val SophisticatedLightSuccess = Color(0xFF059669)     // Emerald 600
+val SophisticatedLightSuccessContainer = Color(0xFFD1FAE5) // Emerald 100
+val SophisticatedLightSuccessBorder = Color(0x66059669)
 
-val SophisticatedLightWarning = Color(0xFFE65100)
-val SophisticatedLightWarningContainer = Color(0xFFFFF3E0)
+val SophisticatedLightWarning = Color(0xFFD97706)     // Amber 600
+val SophisticatedLightWarningContainer = Color(0xFFFEF3C7) // Amber 100
 
-val SophisticatedLightError = Color(0xFFB3261E)
-val SophisticatedLightErrorContainer = Color(0xFFF9DEDC)
+val SophisticatedLightError = Color(0xFFDC2626)       // Red 600
+val SophisticatedLightErrorContainer = Color(0xFFFEE2E2) // Red 100
 
-val SophisticatedLightBadgeBg = Color(0xFFECEFF1)
+val SophisticatedLightBadgeBg = Color(0xFFE2E8F0)
 
 // ==========================================
 // Aliases mapped for seamless app compatibility
 // ==========================================
-val BrandNavy900 = Color(0xFF1C1B1F)
-val BrandNavy800 = Color(0xFF211F26)
-val BrandNavy700 = Color(0xFF2B2930)
-val BrandBlue600 = Color(0xFFD0BCFF)
-val BrandBlue500 = Color(0xFFD0BCFF)
-val BrandBlue100 = Color(0xFF381E72)
-val BrandCyan100 = Color(0xFF381E72)
-val BrandCyan400 = Color(0xFFD0BCFF)
-val BrandCyan500 = Color(0xFFD0BCFF)
-val BrandCyan600 = Color(0xFFB69DF8)
+val BrandNavy900 = Color(0xFF0F172A)
+val BrandNavy800 = Color(0xFF1E293B)
+val BrandNavy700 = Color(0xFF334155)
+val BrandBlue600 = Color(0xFF2563EB)
+val BrandBlue500 = Color(0xFF3B82F6)
+val BrandBlue100 = Color(0xFFDBEAFE)
+val BrandCyan100 = Color(0xFFCFFAFE)
+val BrandCyan400 = Color(0xFF22D3EE)
+val BrandCyan500 = Color(0xFF06B6D4)
+val BrandCyan600 = Color(0xFF0891B2)
 
 // Functional & State Colors
 val SuccessGreen600 = Color(0xFFB4E28B)

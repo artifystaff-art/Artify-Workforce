@@ -24,6 +24,12 @@ interface UserDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertUsers(users: List<UserEntity>)
 
+    @Update
+    suspend fun updateUser(user: UserEntity)
+
+    @Query("UPDATE users SET avatarUrl = :avatarUrl WHERE employeeId = :employeeId")
+    suspend fun updateAvatarUrl(employeeId: String, avatarUrl: String)
+
     @Query("SELECT COUNT(*) FROM users")
     suspend fun getUserCount(): Int
 }

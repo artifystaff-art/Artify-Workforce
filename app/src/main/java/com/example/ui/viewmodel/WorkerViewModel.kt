@@ -53,7 +53,8 @@ data class WorkerUiState(
     val lastAttendanceResult: AttendanceEntity? = null,
     val showStartShiftDialog: Boolean = false,
     val showEndShiftDialog: Boolean = false,
-    val showLeaveDialog: Boolean = false
+    val showLeaveDialog: Boolean = false,
+    val showProfileCameraDialog: Boolean = false
 )
 
 class WorkerViewModel(
@@ -364,26 +365,6 @@ class WorkerViewModel(
     }
 
     fun setStartShiftDialog(show: Boolean) {
-        if (show) {
-            val geofence = _uiState.value.currentGeofenceResult
-            val project = _uiState.value.assignedProject
-            if (geofence != null && !geofence.isInside) {
-                val distance = geofence.distanceMeters.toInt()
-                val radius = project?.geofenceRadiusMeters?.toInt() ?: 100
-                val siteName = project?.projectName ?: "assigned work site"
-                _uiState.value = _uiState.value.copy(
-                    errorMessage = if (geofence.status == GeofenceStatus.MOCK_LOCATION_DETECTED) {
-                        "Clock-In Blocked: Mock/Spoofed GPS location detected. Please disable mock location apps."
-                    } else if (geofence.status == GeofenceStatus.GPS_UNAVAILABLE) {
-                        "Clock-In Blocked: GPS location unavailable. Please enable device location services."
-                    } else {
-                        "Clock-In Blocked: You are $distance m away from $siteName (Allowed radius: $radius m). You must be on-site to clock in."
-                    },
-                    showStartShiftDialog = false
-                )
-                return
-            }
-        }
         _uiState.value = _uiState.value.copy(showStartShiftDialog = show)
     }
 
@@ -413,6 +394,30 @@ class WorkerViewModel(
 
     fun setLeaveDialog(show: Boolean) {
         _uiState.value = _uiState.value.copy(showLeaveDialog = show)
+    }
+
+    fun setProfileCameraDialog(show: Boolean) {
+        _uiState.value = _uiState.value.copy(showProfileCameraDialog = show)
+    }
+
+    fun updateProfilePicture(filePath: String) {
+        val currentUser = _uiState.value.currentUser ?: return
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isProcessing = true, showProfileCameraDialog = false)
+            val result = repository.updateUserProfilePicture(currentUser.employeeId, filePath)
+            result.onSuccess { updatedUser ->
+                _uiState.value = _uiState.value.copy(
+                    currentUser = updatedUser,
+                    isProcessing = false,
+                    statusMessage = "Profile picture updated successfully!"
+                )
+            }.onFailure { err ->
+                _uiState.value = _uiState.value.copy(
+                    isProcessing = false,
+                    errorMessage = "Failed to update profile picture: ${err.message}"
+                )
+            }
+        }
     }
 }
 
