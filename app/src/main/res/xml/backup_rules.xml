@@ -6,8 +6,9 @@
    See https://developer.android.com/about/versions/12/backup-restore
 -->
 <full-backup-content>
-    <!--
-   <include domain="sharedpref" path="."/>
-   <exclude domain="sharedpref" path="device.xml"/>
--->
+    <!-- The device-bound session (device_id, refresh token, access token) must
+         never be restored onto a different physical device: Android Keystore
+         keys aren't portable across devices anyway, but excluding the file
+         explicitly makes that guarantee independent of Keystore behavior. -->
+    <exclude domain="sharedpref" path="artify_secure_session.xml"/>
 </full-backup-content>

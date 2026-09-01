@@ -365,6 +365,27 @@ class WorkerViewModel(
     }
 
     fun setStartShiftDialog(show: Boolean) {
+        // Geofence/GPS/mock-location status is never a gate on attendance — it is only
+        // surfaced as a non-blocking heads-up so the worker knows the shift will be
+        // flagged for supervisor review. The selfie capture dialog always opens.
+        if (show) {
+            val geofence = _uiState.value.currentGeofenceResult
+            val project = _uiState.value.assignedProject
+            if (geofence != null && !geofence.isInside) {
+                val distance = geofence.distanceMeters.toInt()
+                val radius = project?.geofenceRadiusMeters?.toInt() ?: 100
+                val siteName = project?.projectName ?: "assigned work site"
+                _uiState.value = _uiState.value.copy(
+                    statusMessage = if (geofence.status == GeofenceStatus.MOCK_LOCATION_DETECTED) {
+                        "Heads up: Mock/Spoofed GPS location detected. Your shift will be recorded and flagged for supervisor review."
+                    } else if (geofence.status == GeofenceStatus.GPS_UNAVAILABLE) {
+                        "Heads up: GPS location unavailable. Your shift will be recorded and flagged for supervisor review."
+                    } else {
+                        "Heads up: You are $distance m away from $siteName (allowed radius: $radius m). Your shift will be recorded and flagged for supervisor review."
+                    }
+                )
+            }
+        }
         _uiState.value = _uiState.value.copy(showStartShiftDialog = show)
     }
 

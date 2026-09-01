@@ -7,6 +7,7 @@ import com.example.data.AppDatabase
 import com.example.data.entity.*
 import com.example.model.*
 import com.example.notifications.FcmNotificationManager
+import com.example.security.PasswordHasher
 import com.example.server.LocationUtils
 import com.example.server.NtpTimeService
 import com.example.server.ServerAuthorityEngine
@@ -88,7 +89,7 @@ class WorkforceRepository(
             fullName = "Ahmed Ali Al-Balushi",
             phone = "+968 9123 4567",
             email = "worker@artify.demo",
-            passwordHash = "password123",
+            passwordHash = PasswordHasher.hash("password123"),
             companyId = "CMP-ARTIFY-01",
             companyName = "Artify Demo Company",
             assignedProjectId = "PRJ-001",
@@ -105,7 +106,7 @@ class WorkforceRepository(
             fullName = "Fatima Al-Harthy",
             phone = "+968 9234 5678",
             email = "staff@artify.demo",
-            passwordHash = "password123",
+            passwordHash = PasswordHasher.hash("password123"),
             companyId = "CMP-ARTIFY-01",
             companyName = "Artify Demo Company",
             assignedProjectId = "PRJ-002",
@@ -122,7 +123,7 @@ class WorkforceRepository(
             fullName = "Tariq Al-Said",
             phone = "+968 9345 6789",
             email = "supervisor@artify.demo",
-            passwordHash = "password123",
+            passwordHash = PasswordHasher.hash("password123"),
             companyId = "CMP-ARTIFY-01",
             companyName = "Artify Demo Company",
             assignedProjectId = "PRJ-001",
@@ -139,7 +140,7 @@ class WorkforceRepository(
             fullName = "Artify Staff Admin",
             phone = "+968 9999 8888",
             email = "artifystaff@gmail.com",
-            passwordHash = "password123",
+            passwordHash = PasswordHasher.hash("password123"),
             companyId = "CMP-ARTIFY-01",
             companyName = "Artify Demo Company",
             assignedProjectId = "PRJ-001",
@@ -156,7 +157,7 @@ class WorkforceRepository(
             fullName = "Khalid Mansoor",
             phone = "+968 9456 7890",
             email = "khalid@artify.demo",
-            passwordHash = "password123",
+            passwordHash = PasswordHasher.hash("password123"),
             companyId = "CMP-ARTIFY-01",
             companyName = "Artify Demo Company",
             assignedProjectId = "PRJ-001",
@@ -173,7 +174,7 @@ class WorkforceRepository(
             fullName = "Salim Al-Jabri",
             phone = "+968 9567 8901",
             email = "salim@artify.demo",
-            passwordHash = "password123",
+            passwordHash = PasswordHasher.hash("password123"),
             companyId = "CMP-ARTIFY-01",
             companyName = "Artify Demo Company",
             assignedProjectId = "PRJ-003",
@@ -343,13 +344,14 @@ class WorkforceRepository(
         var user = userDao.getUserByEmail(trimmedEmail)
 
         if (user == null) {
-            // Auto-provision if user email is artifystaff@gmail.com or newly provided work email
-            val isStaffAdmin = trimmedEmail.equals("artifystaff@gmail.com", ignoreCase = true) || trimmedEmail.contains("admin", ignoreCase = true)
+            // No Civil ID / HCMS employee-master lookup exists yet (tracked separately) — until
+            // that lands, an unrecognized work email is auto-provisioned as a plain WORKER only.
+            // It must never be able to grant itself an elevated role by its email address.
             val serverTime = ServerAuthorityEngine.getServerTimestamp()
-            val role = if (isStaffAdmin) UserRole.SUPERVISOR else UserRole.WORKER
+            val role = UserRole.WORKER
             val count = userDao.getUserCount() + 1
             val empId = role.idPrefix + String.format("%06d", count)
-            val name = if (isStaffAdmin) "Artify Staff Admin" else trimmedEmail.substringBefore("@").replace(".", " ").split(" ").joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
+            val name = trimmedEmail.substringBefore("@").replace(".", " ").split(" ").joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
 
             val autoUser = UserEntity(
                 userId = "USR-" + UUID.randomUUID().toString().take(8).uppercase(),
@@ -358,20 +360,19 @@ class WorkforceRepository(
                 fullName = if (name.isNotBlank()) name else "Enterprise Staff",
                 phone = "+968 9123 0000",
                 email = trimmedEmail,
-                passwordHash = passwordAttempt.trim().ifBlank { "password123" },
+                passwordHash = PasswordHasher.hash(passwordAttempt.trim().ifBlank { "password123" }),
                 companyId = "CMP-ARTIFY-01",
                 companyName = "Artify Demo Company",
                 assignedProjectId = "PRJ-001",
-                department = if (isStaffAdmin) "Workforce Operations & Payroll" else "Site Engineering",
+                department = "Site Engineering",
                 status = "ACTIVE",
                 avatarUrl = "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d",
                 createdAtUtc = serverTime.timestampUtc
             )
             userDao.insertUser(autoUser)
             user = autoUser
-        } else if (user.passwordHash != passwordAttempt.trim() && passwordAttempt.trim() != "password123") {
-            // Allow password123 or registered password for seamless testing
-            return Result.failure(Exception("Incorrect password provided. Please use your password or demo password 'password123'."))
+        } else if (!PasswordHasher.verify(passwordAttempt.trim(), user.passwordHash)) {
+            return Result.failure(Exception("Incorrect password provided."))
         }
 
         val serverTime = ServerAuthorityEngine.getServerTimestamp()
@@ -417,7 +418,7 @@ class WorkforceRepository(
             fullName = fullName.trim(),
             phone = phone.trim(),
             email = email.trim(),
-            passwordHash = password.trim(),
+            passwordHash = PasswordHasher.hash(password.trim()),
             companyId = "CMP-ARTIFY-01",
             companyName = "Artify Demo Company",
             assignedProjectId = assignedProjectId,
@@ -503,8 +504,11 @@ class WorkforceRepository(
             return Result.failure(Exception("Active shift already in progress since ${existingActive.startTimeFormatted}. Must end active shift first."))
         }
 
-        // 2. Authoritative Geofence Validation (Google Location Services & Server Engine)
-        // Geofence data is evaluated to log location & distance for Head Office HR honesty review
+        // 2. Geofence/GPS/mock-location evaluation (Google Location Services & Server Engine).
+        // These are compliance signals for Head Office HR / supervisor review, NOT a gate on
+        // attendance: the shift is always recorded regardless of location result, and any
+        // violation (outside radius, low accuracy, mock location, or GPS unavailable) is
+        // captured on the record via startGeofenceStatus/verificationStatus below.
         val geofenceResult = ServerAuthorityEngine.evaluateGeofence(
             latitude = latitude,
             longitude = longitude,

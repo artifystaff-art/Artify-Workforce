@@ -36,6 +36,37 @@ import com.example.server.ServerAuthorityEngine
 import com.example.server.ServerGeofenceResult
 import com.example.ui.theme.*
 
+/**
+ * Persistent indicator that the current session is Demo Mode (locally-seeded
+ * fake data only), never the real backend. Per the workforce-platform spec,
+ * Demo Mode must always be clearly distinguishable from a real account.
+ */
+@Composable
+fun DemoModeBanner(modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = SophisticatedWarningContainer
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Default.Science, contentDescription = null, tint = SophisticatedWarning, modifier = Modifier.size(13.dp))
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = "DEMO MODE — sample data only, not connected to the real workforce backend",
+                color = SophisticatedWarning,
+                fontSize = 10.5.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.3.sp
+            )
+        }
+    }
+}
+
 @Composable
 fun ArtifyTopHeader(
     userName: String,
