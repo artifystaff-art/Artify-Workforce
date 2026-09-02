@@ -12,8 +12,10 @@ import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.Backspace
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Engineering
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material.icons.filled.Work
@@ -88,6 +90,7 @@ private fun CivilIdRegisterContent(
     var civilId by remember { mutableStateOf("") }
     var pin by remember { mutableStateOf("") }
     var confirmPin by remember { mutableStateOf("") }
+    var showDemoPicker by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -179,50 +182,79 @@ private fun CivilIdRegisterContent(
         HorizontalDivider()
         Spacer(modifier = Modifier.height(16.dp))
 
-        Text("Not on the roster yet, or just exploring?", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(modifier = Modifier.height(12.dp))
-        QuickDemoAccessSection(demoAuthViewModel)
+        DemoModeEntryCard(onClick = { showDemoPicker = true })
         Spacer(modifier = Modifier.height(30.dp))
+    }
+
+    if (showDemoPicker) {
+        DemoAccountPickerDialog(
+            demoAuthViewModel = demoAuthViewModel,
+            onDismiss = { showDemoPicker = false }
+        )
     }
 }
 
 @Composable
-private fun QuickDemoAccessSection(demoAuthViewModel: AuthViewModel) {
+private fun DemoModeEntryCard(onClick: () -> Unit) {
     Surface(
+        onClick = onClick,
         shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                "QUICK DEMO ACCESS",
-                color = MaterialTheme.colorScheme.primary,
-                fontSize = 10.5.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp
-            )
-            Spacer(modifier = Modifier.height(10.dp))
-            DemoAccountRow(
-                icon = Icons.Default.Shield, name = "Artify Staff Admin", role = "Supervisor Admin",
-                color = MaterialTheme.colorScheme.primary,
-                onClick = { demoAuthViewModel.quickLoginAsEmail("artifystaff@gmail.com") }
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            DemoAccountRow(
-                icon = Icons.Default.Engineering, name = "Ahmed Ali Al-Balushi", role = "Worker",
-                color = MaterialTheme.colorScheme.secondary,
-                onClick = { demoAuthViewModel.quickLoginAs(UserRole.WORKER) }
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            DemoAccountRow(
-                icon = Icons.Default.Work, name = "Fatima Al-Harthy", role = "Staff",
-                color = MaterialTheme.colorScheme.tertiary,
-                onClick = { demoAuthViewModel.quickLoginAs(UserRole.STAFF) }
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            DemoAccountRow(
-                icon = Icons.Default.AdminPanelSettings, name = "Tariq Al-Said", role = "Supervisor",
-                color = MaterialTheme.colorScheme.error,
-                onClick = { demoAuthViewModel.quickLoginAs(UserRole.SUPERVISOR) }
-            )
+        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier.size(46.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)),
+                contentAlignment = Alignment.Center
+            ) { Icon(Icons.Default.PlayCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) }
+            Spacer(modifier = Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Not on the roster yet? Try the Demo", fontSize = 13.5.sp, fontWeight = FontWeight.Bold)
+                Text("Explore every screen with a sample account", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        }
+    }
+}
+
+@Composable
+private fun DemoAccountPickerDialog(demoAuthViewModel: AuthViewModel, onDismiss: () -> Unit) {
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Column {
+                        Text("Choose a Demo Account", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text("Sample data only — nothing here touches the real backend", fontSize = 10.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, contentDescription = "Close") }
+                }
+                Spacer(modifier = Modifier.height(14.dp))
+                DemoAccountRow(
+                    icon = Icons.Default.Shield, name = "Artify Staff Admin", role = "Supervisor Admin",
+                    color = MaterialTheme.colorScheme.primary,
+                    onClick = { demoAuthViewModel.quickLoginAsEmail("artifystaff@gmail.com") }
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                DemoAccountRow(
+                    icon = Icons.Default.Engineering, name = "Ahmed Ali Al-Balushi", role = "Worker",
+                    color = MaterialTheme.colorScheme.secondary,
+                    onClick = { demoAuthViewModel.quickLoginAs(UserRole.WORKER) }
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                DemoAccountRow(
+                    icon = Icons.Default.Work, name = "Fatima Al-Harthy", role = "Staff",
+                    color = MaterialTheme.colorScheme.tertiary,
+                    onClick = { demoAuthViewModel.quickLoginAs(UserRole.STAFF) }
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                DemoAccountRow(
+                    icon = Icons.Default.AdminPanelSettings, name = "Tariq Al-Said", role = "Supervisor",
+                    color = MaterialTheme.colorScheme.error,
+                    onClick = { demoAuthViewModel.quickLoginAs(UserRole.SUPERVISOR) }
+                )
+            }
         }
     }
 }
