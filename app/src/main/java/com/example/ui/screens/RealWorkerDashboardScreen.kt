@@ -103,11 +103,16 @@ fun RealWorkerDashboardScreen(
         }
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-            when (tab) {
-                RealWorkerTab.SHIFT -> ShiftTab(uiState, viewModel, onViewLogs = { tab = RealWorkerTab.LOGS })
-                RealWorkerTab.LOGS -> DailyLogsTab(uiState, viewModel)
-                RealWorkerTab.LEAVE -> LeaveTab(uiState, viewModel)
-                RealWorkerTab.PROFILE -> ProfileTab(uiState, employeeName, employeeCode, onLogout)
+            Column(modifier = Modifier.fillMaxSize()) {
+                SyncQueueBanner(uiState.syncQueue, onSyncNow = { viewModel.syncNow() })
+                Box(modifier = Modifier.weight(1f)) {
+                    when (tab) {
+                        RealWorkerTab.SHIFT -> ShiftTab(uiState, viewModel, onViewLogs = { tab = RealWorkerTab.LOGS })
+                        RealWorkerTab.LOGS -> DailyLogsTab(uiState, viewModel)
+                        RealWorkerTab.LEAVE -> LeaveTab(uiState, viewModel)
+                        RealWorkerTab.PROFILE -> ProfileTab(uiState, employeeName, employeeCode, onLogout)
+                    }
+                }
             }
 
             uiState.statusMessage?.let { msg ->
@@ -182,8 +187,6 @@ private fun ShiftTab(uiState: RealWorkerUiState, viewModel: RealWorkerViewModel,
         modifier = Modifier.fillMaxSize().padding(20.dp).verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        SyncQueueBanner(uiState.syncQueue, onSyncNow = { viewModel.syncNow() })
-        Spacer(modifier = Modifier.height(16.dp))
         Surface(
             onClick = { if (active != null) viewModel.setEndShiftDialog(true) else viewModel.setStartShiftDialog(true) },
             enabled = !uiState.isProcessing,
@@ -542,7 +545,7 @@ private fun SyncQueueBanner(queue: SyncQueueStatus, onSyncNow: () -> Unit) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     when {
-                        !queue.isOnline -> "Offline"
+                        !queue.isOnline -> "Offline — showing last synced data"
                         queue.isSyncing -> "Syncing…"
                         queue.failedCount > 0 -> "${queue.failedCount} item(s) failed to sync"
                         else -> "${queue.pendingCount} item(s) waiting to sync"

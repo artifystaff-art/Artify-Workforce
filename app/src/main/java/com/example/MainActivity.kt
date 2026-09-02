@@ -23,6 +23,7 @@ import com.example.data.repository.BackendAuthRepository
 import com.example.data.repository.BackendWorkforceRepository
 import com.example.data.repository.WorkforceRepository
 import com.example.data.sync.NetworkMonitor
+import com.example.data.sync.OfflineCache
 import com.example.data.sync.RealSyncManager
 import com.example.location.LocationHelper
 import com.example.model.UserRole
@@ -123,7 +124,10 @@ fun ArtifyAppRoot() {
                 val syncManager = remember(signedInEmployee.id) {
                     RealSyncManager(context, backendWorkforceRepository, NetworkMonitor(context), signedInEmployee.id)
                 }
-                val workerViewModel = remember(signedInEmployee.id) { RealWorkerViewModel(backendWorkforceRepository, locationHelper, syncManager) }
+                val offlineCache = remember { OfflineCache(context) }
+                val workerViewModel = remember(signedInEmployee.id) {
+                    RealWorkerViewModel(backendWorkforceRepository, locationHelper, syncManager, offlineCache, signedInEmployee.id)
+                }
                 RealWorkerDashboardScreen(
                     viewModel = workerViewModel,
                     aiAssistantViewModel = aiAssistantViewModel,

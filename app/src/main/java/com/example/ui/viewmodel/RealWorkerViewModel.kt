@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.repository.BackendResult
 import com.example.data.repository.BackendWorkforceRepository
+import com.example.data.sync.OfflineCache
 import com.example.data.sync.RealSyncManager
 import com.example.data.sync.SyncQueueStatus
 import com.example.location.LocationHelper
@@ -47,7 +48,9 @@ data class RealWorkerUiState(
 class RealWorkerViewModel(
     private val repository: BackendWorkforceRepository,
     private val locationHelper: LocationHelper,
-    private val syncManager: RealSyncManager
+    private val syncManager: RealSyncManager,
+    private val offlineCache: OfflineCache,
+    private val employeeId: String
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(RealWorkerUiState())
@@ -107,27 +110,52 @@ class RealWorkerViewModel(
             if (!pendingLocalClockIn) {
                 when (val result = repository.myShifts()) {
                     is BackendResult.Success -> {
+                        offlineCache.cacheShifts(employeeId, result.value)
                         val active = result.value.firstOrNull { it.status == "OPEN" }
                         val history = result.value.filter { it.status != "OPEN" }
                         _uiState.value = _uiState.value.copy(activeShift = active, shiftHistory = history, isLoading = false)
                     }
-                    is BackendResult.Failure -> _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = result.message)
+                    is BackendResult.Failure -> {
+                        val cached = if (result.isNetworkError) offlineCache.getCachedShifts(employeeId) else null
+                        if (cached != null) {
+                            val active = cached.firstOrNull { it.status == "OPEN" }
+                            val history = cached.filter { it.status != "OPEN" }
+                            _uiState.value = _uiState.value.copy(activeShift = active, shiftHistory = history, isLoading = false)
+                        } else {
+                            _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = result.message)
+                        }
+                    }
                 }
             } else {
                 _uiState.value = _uiState.value.copy(isLoading = false)
             }
             when (val result = repository.myLeaveRequests()) {
-                is BackendResult.Success -> _uiState.value = _uiState.value.copy(leaveHistory = result.value)
-                is BackendResult.Failure -> { /* keep prior leave list; attendance error already surfaced */ }
+                is BackendResult.Success -> {
+                    offlineCache.cacheLeave(employeeId, result.value)
+                    _uiState.value = _uiState.value.copy(leaveHistory = result.value)
+                }
+                is BackendResult.Failure -> {
+                    if (result.isNetworkError) offlineCache.getCachedLeave(employeeId)?.let { _uiState.value = _uiState.value.copy(leaveHistory = it) }
+                }
             }
             when (val result = repository.myNotifications()) {
-                is BackendResult.Success -> _uiState.value = _uiState.value.copy(notifications = result.value)
-                is BackendResult.Failure -> { /* keep prior notifications */ }
+                is BackendResult.Success -> {
+                    offlineCache.cacheNotifications(employeeId, result.value)
+                    _uiState.value = _uiState.value.copy(notifications = result.value)
+                }
+                is BackendResult.Failure -> {
+                    if (result.isNetworkError) offlineCache.getCachedNotifications(employeeId)?.let { _uiState.value = _uiState.value.copy(notifications = it) }
+                }
             }
             if (_uiState.value.profile == null) {
                 when (val result = repository.myProfile()) {
-                    is BackendResult.Success -> _uiState.value = _uiState.value.copy(profile = result.value)
-                    is BackendResult.Failure -> { /* profile stays null; screen shows fallback text */ }
+                    is BackendResult.Success -> {
+                        offlineCache.cacheProfile(employeeId, result.value)
+                        _uiState.value = _uiState.value.copy(profile = result.value)
+                    }
+                    is BackendResult.Failure -> {
+                        if (result.isNetworkError) offlineCache.getCachedProfile(employeeId)?.let { _uiState.value = _uiState.value.copy(profile = it) }
+                    }
                 }
             }
         }
