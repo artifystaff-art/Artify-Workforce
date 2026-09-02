@@ -12,12 +12,15 @@ import com.example.network.AttendanceShiftDto
 import com.example.network.LeaveRequestDto
 import com.example.network.NotificationDto
 import com.example.network.ProfileDto
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.io.File
 import java.time.Instant
+import java.time.OffsetDateTime
 import java.util.UUID
 
 /** A shift id prefixed this way represents a queued, not-yet-synced local clock-in — never a real server row. */
@@ -36,7 +39,8 @@ data class RealWorkerUiState(
     val syncQueue: SyncQueueStatus = SyncQueueStatus(),
     val notifications: List<NotificationDto> = emptyList(),
     val profile: ProfileDto? = null,
-    val selfieUrlCache: Map<String, String> = emptyMap()
+    val selfieUrlCache: Map<String, String> = emptyMap(),
+    val shiftDurationFormatted: String = "00:00:00"
 )
 
 /** Drives the real (backend-authenticated) worker attendance/leave flow, with offline queueing. */
@@ -72,6 +76,27 @@ class RealWorkerViewModel(
                 _uiState.value = _uiState.value.copy(activeShift = localPendingShift(queuedOpenClockIn.clientEventId), isLoading = false)
             } else {
                 refresh()
+            }
+        }
+        startLiveShiftTimer()
+    }
+
+    private fun startLiveShiftTimer() {
+        viewModelScope.launch {
+            while (isActive) {
+                val startIso = _uiState.value.activeShift?.clockIn?.serverTimestamp
+                val startInstant = startIso?.let { runCatching { OffsetDateTime.parse(it).toInstant() }.getOrNull() }
+                val formatted = if (startInstant != null) {
+                    val diffSec = (Instant.now().epochSecond - startInstant.epochSecond).coerceAtLeast(0)
+                    val hours = diffSec / 3600
+                    val mins = (diffSec % 3600) / 60
+                    val secs = diffSec % 60
+                    String.format("%02d:%02d:%02d", hours, mins, secs)
+                } else {
+                    "00:00:00"
+                }
+                _uiState.value = _uiState.value.copy(shiftDurationFormatted = formatted)
+                delay(1000L)
             }
         }
     }

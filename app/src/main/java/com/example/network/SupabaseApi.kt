@@ -50,6 +50,9 @@ interface SupabaseApi {
     @POST("supervisor")
     suspend fun roster(@Header("Authorization") bearerToken: String, @Body request: SupervisorActionRequest): Response<RosterResponse>
 
+    @POST("supervisor")
+    suspend fun attendanceRoster(@Header("Authorization") bearerToken: String, @Body request: SupervisorActionRequest): Response<PendingAttendanceResponse>
+
     @POST("ai-assistant")
     suspend fun askAssistant(@Header("Authorization") bearerToken: String, @Body request: AiAssistantRequest): Response<AiAssistantResponse>
 

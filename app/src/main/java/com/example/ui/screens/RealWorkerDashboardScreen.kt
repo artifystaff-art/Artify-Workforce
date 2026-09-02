@@ -46,6 +46,15 @@ private val LEAVE_TYPES = listOf(
     Triple("ANNUAL", "Annual", "30d"), Triple("TRANSIT", "Transit", "Duty")
 )
 
+@Composable
+private fun leaveTypeColor(code: String): androidx.compose.ui.graphics.Color = when (code) {
+    "SICK" -> MaterialTheme.colorScheme.tertiary
+    "CASUAL" -> MaterialTheme.colorScheme.secondary
+    "ANNUAL" -> MaterialTheme.colorScheme.primary
+    "TRANSIT" -> androidx.compose.ui.graphics.Color(0xFFC084FC)
+    else -> MaterialTheme.colorScheme.onSurfaceVariant
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RealWorkerDashboardScreen(
@@ -187,40 +196,62 @@ private fun ShiftTab(uiState: RealWorkerUiState, viewModel: RealWorkerViewModel,
                 else {
                     Icon(Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(32.dp))
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text(if (active != null) "End Shift" else "Start Shift", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                    Text("with Selfie", fontSize = 11.sp)
+                    Text(if (active != null) "End Shift with Selfie" else "Start Shift with Selfie", fontWeight = FontWeight.Bold, fontSize = 14.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        if (active != null) "Tap to Clock Out" else "Tap to Clock In",
+                        fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
+                        color = if (active != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary
+                    )
                 }
             }
         }
         Spacer(modifier = Modifier.height(24.dp))
 
-        if (active != null) {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Shift in progress", fontWeight = FontWeight.Bold)
-                        if (isQueuedLocally) StatusPill("QUEUED")
-                    }
-                    Text(
-                        if (isQueuedLocally) "Captured offline — will sync automatically." else "Started: ${formatShiftTime(active.clockIn?.serverTimestamp) ?: "—"}",
-                        fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+        Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f), modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(if (active != null) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("SHIFT DURATION COUNTER", fontSize = 9.5.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.6.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    uiState.shiftDurationFormatted, fontSize = 32.sp, fontWeight = FontWeight.Bold,
+                    color = if (active != null) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurface,
+                    style = androidx.compose.ui.text.TextStyle(fontFeatureSettings = "tnum")
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text("Assigned Site: ${uiState.profile?.projectName ?: "—"}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    if (isQueuedLocally) "Captured offline — will sync automatically."
+                    else if (active != null) "Shift in progress — biometric attendance recorded."
+                    else "Ready to record selfie biometric attendance.",
+                    fontSize = 10.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (isQueuedLocally) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    StatusPill("QUEUED")
                 }
             }
-            Spacer(modifier = Modifier.height(16.dp))
         }
+        Spacer(modifier = Modifier.height(16.dp))
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            StatTile("Shifts", (uiState.shiftHistory.size + if (active != null) 1 else 0).toString(), Icons.Default.Checklist, Modifier.weight(1f))
-            StatTile("Pending", uiState.shiftHistory.count { it.status == "PENDING_REVIEW" }.toString(), Icons.Default.Pending, Modifier.weight(1f))
-            StatTile("Leaves", uiState.leaveHistory.count { it.status == "APPROVED" }.toString(), Icons.Default.FlightTakeoff, Modifier.weight(1f))
+            StatTile("Total Shifts", (uiState.shiftHistory.size + if (active != null) 1 else 0).toString(), Icons.Default.Checklist, Modifier.weight(1f))
+            StatTile("Pending Approval", uiState.shiftHistory.count { it.status == "PENDING_REVIEW" }.toString(), Icons.Default.Pending, Modifier.weight(1f))
+            StatTile("Leaves Taken", uiState.leaveHistory.count { it.status == "APPROVED" }.toString(), Icons.Default.FlightTakeoff, Modifier.weight(1f))
+        }
+        Spacer(modifier = Modifier.height(12.dp))
+
+        OutlinedButton(onClick = onViewLogs, modifier = Modifier.fillMaxWidth()) {
+            Icon(Icons.Default.CalendarMonth, contentDescription = null, modifier = Modifier.size(16.dp))
+            Spacer(modifier = Modifier.width(6.dp))
+            Text("View Daily Attendance Logs", fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold)
         }
         Spacer(modifier = Modifier.height(20.dp))
 
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text("RECENT SHIFTS", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            TextButton(onClick = onViewLogs) { Text("View Daily Logs", fontSize = 11.sp) }
-        }
+        Text("RECENT SHIFTS", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.align(Alignment.Start))
         Spacer(modifier = Modifier.height(8.dp))
         if (uiState.shiftHistory.isEmpty()) {
             Text("No completed shifts yet.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -352,7 +383,7 @@ private fun DailyLogsTab(uiState: RealWorkerUiState, viewModel: RealWorkerViewMo
 
         OutlinedTextField(
             value = query, onValueChange = { query = it }, modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("Search by date or status…", fontSize = 12.sp) },
+            placeholder = { Text("Search by date (YYYY-MM-DD), project, or time…", fontSize = 11.5.sp) },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) }, singleLine = true
         )
         Spacer(modifier = Modifier.height(8.dp))
@@ -362,6 +393,11 @@ private fun DailyLogsTab(uiState: RealWorkerUiState, viewModel: RealWorkerViewMo
             }
         }
         Spacer(modifier = Modifier.height(12.dp))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("SHIFT RECORDS (${filtered.size})", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Source: Artify Central Backend", fontSize = 9.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Spacer(modifier = Modifier.height(8.dp))
 
         Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             if (filtered.isEmpty()) {
@@ -413,7 +449,26 @@ private fun DailyLogsTab(uiState: RealWorkerUiState, viewModel: RealWorkerViewMo
                             }
                             shift.reviewComment?.let {
                                 Spacer(modifier = Modifier.height(8.dp))
-                                Text("Supervisor: $it", fontSize = 10.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                val isRejected = shift.status == "REJECTED"
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = (if (isRejected) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary).copy(alpha = 0.15f),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            if (isRejected) Icons.Default.ErrorOutline else Icons.Default.CheckCircle,
+                                            contentDescription = null,
+                                            tint = if (isRejected) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            "Supervisor: $it", fontSize = 10.5.sp,
+                                            color = if (isRejected) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -508,6 +563,9 @@ private fun SyncQueueBanner(queue: SyncQueueStatus, onSyncNow: () -> Unit) {
 @Composable
 private fun LeaveTab(uiState: RealWorkerUiState, viewModel: RealWorkerViewModel) {
     var showForm by remember { mutableStateOf(false) }
+    var statusFilter by remember { mutableStateOf("ALL") }
+
+    val filtered = uiState.leaveHistory.filter { statusFilter == "ALL" || it.status == statusFilter }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         if (showForm) {
@@ -517,27 +575,53 @@ private fun LeaveTab(uiState: RealWorkerUiState, viewModel: RealWorkerViewModel)
                 onSubmit = { type, start, end, reason -> viewModel.submitLeave(type, start, end, reason); showForm = false }
             )
         } else {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("Leave & Absence", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                Button(onClick = { showForm = true }) { Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp)); Spacer(modifier = Modifier.width(4.dp)); Text("Request") }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Leave & Absence", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text("Request leave types & track approval status", fontSize = 10.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Button(onClick = { showForm = true }) { Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp)); Spacer(modifier = Modifier.width(4.dp)); Text("Request Leave") }
             }
             Spacer(modifier = Modifier.height(12.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                LEAVE_TYPES.forEach { (_, label, quota) ->
+                LEAVE_TYPES.forEach { (code, label, quota) ->
                     Card(modifier = Modifier.weight(1f)) {
                         Column(modifier = Modifier.padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(quota, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = leaveTypeColor(code))
                             Text(label, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(quota, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                         }
                     }
                 }
             }
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf("ALL" to "All (${uiState.leaveHistory.size})", "PENDING" to "Pending", "APPROVED" to "Approved", "REJECTED" to "Rejected").forEach { (code, label) ->
+                    FilterChip(selected = statusFilter == code, onClick = { statusFilter = code }, label = { Text(label, fontSize = 10.sp) })
+                }
+            }
             Spacer(modifier = Modifier.height(16.dp))
-            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                if (uiState.leaveHistory.isEmpty()) {
-                    Text("No leave requests yet.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                } else {
-                    uiState.leaveHistory.forEach { leave -> LeaveCard(leave) }
+            if (filtered.isEmpty()) {
+                Column(modifier = Modifier.fillMaxWidth().padding(top = 48.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.size(56.dp)) {
+                        Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.CalendarMonth, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        if (uiState.leaveHistory.isEmpty()) "No leave requests submitted yet" else "No requests match this filter",
+                        fontWeight = FontWeight.Bold, fontSize = 13.sp
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("Submit a Sick, Casual, Annual, or Transit leave request", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(onClick = { showForm = true }) {
+                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Create Leave Request")
+                    }
+                }
+            } else {
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    filtered.forEach { leave -> LeaveCard(leave) }
                 }
             }
         }
@@ -700,6 +784,7 @@ private fun ProfileTab(uiState: RealWorkerUiState, fallbackName: String, fallbac
     val context = LocalContext.current
     val themePreferences = remember { ThemePreferences.getInstance(context) }
     val themeSettings by themePreferences.settings.collectAsState()
+    val isSystemDark = com.example.ui.theme.LocalIsDarkTheme.current
     var showThemeDialog by remember { mutableStateOf(false) }
     val deviceId = remember { SecureSessionStore.getInstance(context).deviceId }
 
@@ -727,37 +812,73 @@ private fun ProfileTab(uiState: RealWorkerUiState, fallbackName: String, fallbac
 
         // Display & Environment Theme
         Spacer(modifier = Modifier.height(20.dp))
-        ProfileSectionLabel("DISPLAY & ENVIRONMENT")
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            ProfileSectionLabel("DISPLAY & ENVIRONMENT THEME", modifier = Modifier.weight(1f))
+            Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.padding(bottom = 6.dp)) {
+                Text(
+                    if (isSystemDark) "DARK MODE" else "LIGHT MODE", fontSize = 9.sp, fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                )
+            }
+        }
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Column {
-                        Text("Theme Mode", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                        Text(themeSettings.themeMode.displayName, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        listOf(ThemeMode.SYSTEM, ThemeMode.LIGHT, ThemeMode.DARK).forEach { mode ->
-                            val selected = themeSettings.themeMode == mode
-                            Surface(
-                                onClick = { themePreferences.setThemeMode(mode) },
-                                shape = RoundedCornerShape(8.dp),
-                                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                                modifier = Modifier.padding(start = 4.dp)
+                Text(
+                    "High-contrast dynamic themes designed for bright daylight and night construction visibility.",
+                    fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, lineHeight = 15.sp
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(ThemeMode.SYSTEM, ThemeMode.DARK, ThemeMode.LIGHT).forEach { mode ->
+                        val selected = themeSettings.themeMode == mode
+                        Surface(
+                            onClick = { themePreferences.setThemeMode(mode) },
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(vertical = 9.dp).fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically
                             ) {
+                                Icon(
+                                    when (mode) { ThemeMode.SYSTEM -> Icons.Default.Settings; ThemeMode.DARK -> Icons.Default.DarkMode; ThemeMode.LIGHT -> Icons.Default.LightMode },
+                                    contentDescription = null,
+                                    tint = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(13.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
                                 Text(
                                     mode.shortName, fontSize = 10.sp, fontWeight = FontWeight.Bold,
-                                    color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
+                                    color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
                     }
                 }
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.DarkMode, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text("Dark Theme", fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                if (themeSettings.themeMode == ThemeMode.SYSTEM) "Following System Mode" else themeSettings.themeMode.displayName,
+                                fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    Switch(
+                        checked = isSystemDark,
+                        onCheckedChange = { themePreferences.setThemeMode(if (it) ThemeMode.DARK else ThemeMode.LIGHT) }
+                    )
+                }
                 Spacer(modifier = Modifier.height(10.dp))
                 OutlinedButton(onClick = { showThemeDialog = true }, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Default.Palette, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Configure Dynamic Colors", fontSize = 12.sp)
+                    Text("Configure Dynamic Colors & System Themes", fontSize = 12.sp)
                 }
             }
         }
@@ -818,9 +939,9 @@ private fun ProfileTab(uiState: RealWorkerUiState, fallbackName: String, fallbac
 }
 
 @Composable
-private fun ProfileSectionLabel(text: String) {
+private fun ProfileSectionLabel(text: String, modifier: Modifier = Modifier.fillMaxWidth()) {
     Text(
         text, fontSize = 10.5.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.6.sp,
-        color = MaterialTheme.colorScheme.primary, modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)
+        color = MaterialTheme.colorScheme.primary, modifier = modifier.padding(bottom = 6.dp)
     )
 }

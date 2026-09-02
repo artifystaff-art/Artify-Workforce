@@ -21,7 +21,6 @@ import com.example.network.AttendanceShiftDto
 import com.example.network.AuditLogDto
 import com.example.network.ErpEventDto
 import com.example.network.LeaveRequestDto
-import com.example.network.RosterEmployeeDto
 import com.example.network.SiteDto
 import com.example.network.SupervisorMetricsDto
 import com.example.ui.components.AiAssistantDialog
@@ -191,7 +190,8 @@ private fun ApproveCommentPrompt(onDismiss: () -> Unit, onConfirm: (String) -> U
 @Composable
 private fun ApprovalsTab(uiState: RealSupervisorUiState, onInspect: (AttendanceShiftDto) -> Unit, onApprove: (String) -> Unit, onReject: (String) -> Unit) {
     Column(modifier = Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState())) {
-        Text("Pending Attendance (${uiState.pendingAttendance.size})", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        Text("Pending Attendance Submissions (${uiState.pendingAttendance.size})", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        Text("Review selfie biometric evidence & verified server timestamps", fontSize = 10.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(modifier = Modifier.height(12.dp))
         if (uiState.pendingAttendance.isEmpty()) {
             Text("Nothing pending review.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -204,21 +204,47 @@ private fun ApprovalsTab(uiState: RealSupervisorUiState, onInspect: (AttendanceS
 private fun AttendanceApprovalCard(shift: AttendanceShiftDto, onInspect: (AttendanceShiftDto) -> Unit, onApprove: (String) -> Unit, onReject: (String) -> Unit) {
     Card(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
         Column(modifier = Modifier.padding(14.dp)) {
-            Text(shift.employee?.fullName ?: "Unknown", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-            Text("${shift.employee?.employeeCode ?: ""} • ${shift.project?.name ?: ""}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("${shift.shiftDate} • ${shift.totalWorkedMinutes ?: 0} mins", fontSize = 12.sp)
-            if (shift.complianceFlag != "COMPLIANT") {
-                Surface(shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.errorContainer, modifier = Modifier.padding(top = 6.dp)) {
-                    Text("Flag: ${shift.complianceFlag.replace('_', ' ')}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.padding(6.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
+                Column {
+                    Text(shift.employee?.fullName ?: "Unknown", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text("${shift.employee?.employeeCode ?: ""} • ${shift.employee?.role ?: ""}", fontSize = 10.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.secondaryContainer) {
+                    Text("PENDING", fontSize = 9.5.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
+                }
+            }
+            Spacer(modifier = Modifier.height(6.dp))
+            Text("Site: ${shift.project?.name ?: "—"}", fontSize = 11.5.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+            Text(
+                "Shift Duration: ${shift.totalWorkedMinutes ?: 0} mins (${formatShiftTime(shift.clockIn?.serverTimestamp) ?: "—"} to ${formatShiftTime(shift.clockOut?.serverTimestamp) ?: "—"})",
+                fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (shift.clockIn?.selfieStoragePath != null || shift.clockOut?.selfieStoragePath != null) VerifiedPill("Selfie Verified")
+                if (shift.complianceFlag == "COMPLIANT") VerifiedPill("Geofence Verified")
+                else Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.errorContainer) {
+                    Text(shift.complianceFlag.replace('_', ' '), fontSize = 9.5.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
                 }
             }
             Row(modifier = Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = { onInspect(shift) }) { Icon(Icons.Default.Visibility, contentDescription = null, modifier = Modifier.size(14.dp)); Spacer(modifier = Modifier.width(4.dp)); Text("Inspect") }
-                Spacer(modifier = Modifier.width(4.dp))
-                OutlinedButton(onClick = { onReject(shift.id) }) { Text("Reject") }
-                Spacer(modifier = Modifier.width(8.dp))
-                Button(onClick = { onApprove(shift.id) }) { Text("Approve") }
+                OutlinedButton(onClick = { onInspect(shift) }) { Icon(Icons.Default.Visibility, contentDescription = null, modifier = Modifier.size(14.dp)); Spacer(modifier = Modifier.width(4.dp)); Text("Inspect Evidence") }
+                Spacer(modifier = Modifier.width(6.dp))
+                OutlinedButton(onClick = { onReject(shift.id) }, colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Reject") }
+                Spacer(modifier = Modifier.width(6.dp))
+                Button(onClick = { onApprove(shift.id) }) { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp)); Spacer(modifier = Modifier.width(4.dp)); Text("Approve") }
             }
+        }
+    }
+}
+
+@Composable
+private fun VerifiedPill(label: String) {
+    Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.tertiaryContainer) {
+        Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.onTertiaryContainer, modifier = Modifier.size(10.dp))
+            Spacer(modifier = Modifier.width(3.dp))
+            Text(label, fontSize = 9.5.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onTertiaryContainer)
         }
     }
 }
@@ -289,7 +315,8 @@ private fun formatShiftTime(iso: String?): String? {
 @Composable
 private fun LeaveApprovalTab(uiState: RealSupervisorUiState, onApprove: (String) -> Unit, onReject: (String) -> Unit) {
     Column(modifier = Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState())) {
-        Text("Pending Leave (${uiState.pendingLeave.size})", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        Text("Employee Leave & Absence Review", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        Text("Approve or reject workforce absence requests with formal audit logs", fontSize = 10.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(modifier = Modifier.height(12.dp))
         if (uiState.pendingLeave.isEmpty()) {
             Text("No pending leave requests.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -302,12 +329,20 @@ private fun LeaveApprovalTab(uiState: RealSupervisorUiState, onApprove: (String)
 private fun LeaveApprovalCard(leave: LeaveRequestDto, onApprove: (String) -> Unit, onReject: (String) -> Unit) {
     Card(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
         Column(modifier = Modifier.padding(14.dp)) {
-            Text(leave.employee?.fullName ?: "Unknown", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-            Text("${leave.employee?.employeeCode ?: ""} • ${leave.leaveType}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("${leave.startDate} → ${leave.endDate} (${leave.totalDays.toInt()}d)", fontSize = 12.sp)
-            Text(leave.reason, fontSize = 12.sp)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
+                Column {
+                    Text(leave.employee?.fullName ?: "Unknown", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text("ID: ${leave.employee?.employeeCode ?: "—"} • ${leave.leaveType} LEAVE", fontSize = 10.5.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                }
+                Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.secondaryContainer) {
+                    Text("PENDING", fontSize = 9.5.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
+                }
+            }
+            Spacer(modifier = Modifier.height(6.dp))
+            Text("Period: ${leave.startDate} to ${leave.endDate} (${leave.totalDays.toInt()} days)", fontSize = 11.5.sp, fontWeight = FontWeight.Medium)
+            Text("Reason: ${leave.reason}", fontSize = 11.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(modifier = Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.End) {
-                OutlinedButton(onClick = { onReject(leave.id) }) { Text("Reject") }
+                OutlinedButton(onClick = { onReject(leave.id) }, colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Reject") }
                 Spacer(modifier = Modifier.width(8.dp))
                 Button(onClick = { onApprove(leave.id) }) { Text("Approve") }
             }
@@ -346,41 +381,46 @@ private fun SitesTab(sites: List<SiteDto>) {
 private fun RosterTab(uiState: RealSupervisorUiState) {
     var query by remember { mutableStateOf("") }
     var statusFilter by remember { mutableStateOf("ALL") }
-    val filtered = uiState.roster.filter { emp ->
-        val matchesQuery = query.isBlank() || emp.fullName.contains(query, true) || emp.employeeCode.contains(query, true)
-        val matchesStatus = statusFilter == "ALL" || emp.employmentStatus == statusFilter
+    val filtered = uiState.attendanceRoster.filter { shift ->
+        val matchesQuery = query.isBlank() ||
+            (shift.employee?.fullName?.contains(query, true) == true) ||
+            (shift.employee?.employeeCode?.contains(query, true) == true) ||
+            (shift.project?.name?.contains(query, true) == true)
+        val matchesStatus = statusFilter == "ALL" || shift.status == statusFilter
         matchesQuery && matchesStatus
     }
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Text("Workforce Roster (${uiState.roster.size})", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        Text("Workforce Attendance Roster", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        Text("${uiState.attendanceRoster.size} record(s) logged", fontSize = 10.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(modifier = Modifier.height(10.dp))
-        OutlinedTextField(value = query, onValueChange = { query = it }, modifier = Modifier.fillMaxWidth(), placeholder = { Text("Search by name or ID…", fontSize = 12.sp) }, singleLine = true)
+        OutlinedTextField(value = query, onValueChange = { query = it }, modifier = Modifier.fillMaxWidth(), placeholder = { Text("Search by name, ID, or site…", fontSize = 12.sp) }, singleLine = true)
         Spacer(modifier = Modifier.height(8.dp))
         Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            listOf("ALL", "ACTIVE", "INACTIVE", "SUSPENDED").forEach { f ->
-                FilterChip(selected = statusFilter == f, onClick = { statusFilter = f }, label = { Text(f, fontSize = 10.sp) })
+            listOf("ALL", "APPROVED", "PENDING_REVIEW", "REJECTED").forEach { f ->
+                FilterChip(selected = statusFilter == f, onClick = { statusFilter = f }, label = { Text(f.replace('_', ' '), fontSize = 10.sp) })
             }
         }
         Spacer(modifier = Modifier.height(12.dp))
         Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             if (filtered.isEmpty()) {
-                Text("No matching employees.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 16.dp))
+                Text("No matching attendance records.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 16.dp))
             } else {
-                filtered.forEach { emp -> RosterCard(emp) }
+                filtered.forEach { shift -> AttendanceRosterCard(shift) }
             }
         }
     }
 }
 
 @Composable
-private fun RosterCard(emp: RosterEmployeeDto) {
+private fun AttendanceRosterCard(shift: AttendanceShiftDto) {
     Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
         Row(modifier = Modifier.fillMaxWidth().padding(14.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Column {
-                Text(emp.fullName, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                Text("${emp.employeeCode} • ${emp.role}${emp.project?.let { " • ${it.name}" } ?: ""}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(shift.employee?.fullName ?: "Unknown", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                Text("${shift.employee?.employeeCode ?: "—"} • ${shift.project?.name ?: "—"}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("${shift.shiftDate} • ${shift.totalWorkedMinutes ?: 0} mins", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            StatusPill(emp.employmentStatus)
+            StatusPill(shift.status)
         }
     }
 }

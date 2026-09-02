@@ -298,4 +298,16 @@ class BackendWorkforceRepository(
             BackendResult.Failure("Network error: ${e.message ?: "unable to reach the server."}", isNetworkError = true)
         }
     }
+
+    suspend fun attendanceRoster(): BackendResult<List<AttendanceShiftDto>> {
+        val auth = bearer() ?: return BackendResult.Failure("Session expired. Please verify your Civil ID again.")
+        return try {
+            val response = api.attendanceRoster(auth, SupervisorActionRequest(action = "attendance_roster"))
+            val body = response.body()
+            if (!response.isSuccessful || body?.shifts == null) BackendResult.Failure(body?.error ?: "Failed to load attendance roster.")
+            else BackendResult.Success(body.shifts)
+        } catch (e: IOException) {
+            BackendResult.Failure("Network error: ${e.message ?: "unable to reach the server."}", isNetworkError = true)
+        }
+    }
 }

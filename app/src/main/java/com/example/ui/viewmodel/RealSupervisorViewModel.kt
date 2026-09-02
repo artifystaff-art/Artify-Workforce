@@ -8,7 +8,6 @@ import com.example.network.AttendanceShiftDto
 import com.example.network.AuditLogDto
 import com.example.network.ErpEventDto
 import com.example.network.LeaveRequestDto
-import com.example.network.RosterEmployeeDto
 import com.example.network.SiteDto
 import com.example.network.SupervisorMetricsDto
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,7 +18,7 @@ import kotlinx.coroutines.launch
 data class RealSupervisorUiState(
     val pendingAttendance: List<AttendanceShiftDto> = emptyList(),
     val pendingLeave: List<LeaveRequestDto> = emptyList(),
-    val roster: List<RosterEmployeeDto> = emptyList(),
+    val attendanceRoster: List<AttendanceShiftDto> = emptyList(),
     val sites: List<SiteDto> = emptyList(),
     val auditLogs: List<AuditLogDto> = emptyList(),
     val erpEvents: List<ErpEventDto> = emptyList(),
@@ -51,8 +50,8 @@ class RealSupervisorViewModel(private val repository: BackendWorkforceRepository
                 is BackendResult.Success -> _uiState.value = _uiState.value.copy(pendingLeave = result.value)
                 is BackendResult.Failure -> {}
             }
-            when (val result = repository.roster()) {
-                is BackendResult.Success -> _uiState.value = _uiState.value.copy(roster = result.value)
+            when (val result = repository.attendanceRoster()) {
+                is BackendResult.Success -> _uiState.value = _uiState.value.copy(attendanceRoster = result.value)
                 is BackendResult.Failure -> {}
             }
             when (val result = repository.sites()) {
