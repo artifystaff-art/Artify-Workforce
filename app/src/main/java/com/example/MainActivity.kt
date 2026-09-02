@@ -110,6 +110,7 @@ fun ArtifyAppRoot() {
                     viewModel = supervisorViewModel,
                     aiAssistantViewModel = aiAssistantViewModel,
                     supervisorName = signedInEmployee.fullName,
+                    supervisorCode = signedInEmployee.employeeCode,
                     onLogout = { realAuthViewModel.logout() }
                 )
             } else {

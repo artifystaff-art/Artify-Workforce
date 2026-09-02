@@ -24,6 +24,7 @@ import com.example.network.RosterEmployeeDto
 import com.example.network.SiteDto
 import com.example.network.SupervisorMetricsDto
 import com.example.ui.components.AiAssistantDialog
+import com.example.ui.components.ArtifyTopHeader
 import com.example.ui.viewmodel.AiAssistantViewModel
 import com.example.ui.viewmodel.RealSupervisorUiState
 import com.example.ui.viewmodel.RealSupervisorViewModel
@@ -36,6 +37,7 @@ fun RealSupervisorDashboardScreen(
     viewModel: RealSupervisorViewModel,
     aiAssistantViewModel: AiAssistantViewModel,
     supervisorName: String,
+    supervisorCode: String,
     onLogout: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -49,13 +51,18 @@ fun RealSupervisorDashboardScreen(
     Scaffold(
         modifier = modifier.fillMaxSize(),
         topBar = {
-            TopAppBar(
-                title = { Text(supervisorName, fontWeight = FontWeight.Bold, fontSize = 15.sp) },
-                actions = {
-                    IconButton(onClick = { showAssistant = true }) { Icon(Icons.Default.AutoAwesome, contentDescription = "Ask the assistant") }
-                    IconButton(onClick = onLogout) { Icon(Icons.Default.Logout, contentDescription = "Sign out") }
-                }
+            ArtifyTopHeader(
+                userName = supervisorName,
+                employeeId = supervisorCode,
+                role = "SUPERVISOR",
+                onLogoutClick = onLogout,
+                notificationCount = uiState.pendingAttendance.size + uiState.pendingLeave.size
             )
+        },
+        floatingActionButton = {
+            FloatingActionButton(onClick = { showAssistant = true }) {
+                Icon(Icons.Default.AutoAwesome, contentDescription = "Ask the assistant")
+            }
         },
         bottomBar = {
             NavigationBar {

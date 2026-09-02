@@ -28,6 +28,7 @@ import com.example.network.LeaveRequestDto
 import com.example.network.NotificationDto
 import com.example.security.SecureSessionStore
 import com.example.ui.components.AiAssistantDialog
+import com.example.ui.components.ArtifyTopHeader
 import com.example.ui.components.CameraXSelfieDialog
 import com.example.ui.components.ThemeSettingsDialog
 import com.example.ui.theme.ThemeMode
@@ -64,23 +65,19 @@ fun RealWorkerDashboardScreen(
     Scaffold(
         modifier = modifier.fillMaxSize(),
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(employeeName, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                        Text("$employeeCode • $projectName", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                },
-                actions = {
-                    BadgedBox(badge = {
-                        if (uiState.notifications.isNotEmpty()) Badge { Text(uiState.notifications.size.toString()) }
-                    }, modifier = Modifier.padding(end = 4.dp)) {
-                        IconButton(onClick = { showNotifications = true }) { Icon(Icons.Default.Notifications, contentDescription = "Notifications") }
-                    }
-                    IconButton(onClick = { showAssistant = true }) { Icon(Icons.Default.AutoAwesome, contentDescription = "Ask the assistant") }
-                    IconButton(onClick = onLogout) { Icon(Icons.Default.Logout, contentDescription = "Sign out") }
-                }
+            ArtifyTopHeader(
+                userName = employeeName,
+                employeeId = employeeCode,
+                role = uiState.profile?.role ?: "WORKER",
+                onLogoutClick = onLogout,
+                notificationCount = uiState.notifications.size,
+                onNotificationClick = { showNotifications = true }
             )
+        },
+        floatingActionButton = {
+            FloatingActionButton(onClick = { showAssistant = true }) {
+                Icon(Icons.Default.AutoAwesome, contentDescription = "Ask the assistant")
+            }
         },
         bottomBar = {
             NavigationBar {
