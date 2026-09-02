@@ -8,20 +8,28 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.Backspace
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Engineering
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.VerifiedUser
+import androidx.compose.material.icons.filled.Work
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.model.UserRole
 import com.example.network.BackendEmployee
+import com.example.ui.viewmodel.AuthViewModel
 import com.example.ui.viewmodel.RealAuthScreenState
 import com.example.ui.viewmodel.RealAuthViewModel
 
@@ -29,7 +37,7 @@ import com.example.ui.viewmodel.RealAuthViewModel
 @Composable
 fun RealAuthEntryScreen(
     realAuthViewModel: RealAuthViewModel,
-    onContinueInDemoMode: () -> Unit,
+    demoAuthViewModel: AuthViewModel,
     onSignedIn: (BackendEmployee) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -63,7 +71,7 @@ fun RealAuthEntryScreen(
                 errorMessage = uiState.errorMessage,
                 notEligible = uiState.notEligibleForRealAccount,
                 onSubmit = { civilId, pin -> realAuthViewModel.registerWithCivilId(civilId, pin) },
-                onContinueInDemoMode = onContinueInDemoMode
+                demoAuthViewModel = demoAuthViewModel
             )
         }
     }
@@ -75,7 +83,7 @@ private fun CivilIdRegisterContent(
     errorMessage: String?,
     notEligible: Boolean,
     onSubmit: (civilId: String, pin: String) -> Unit,
-    onContinueInDemoMode: () -> Unit
+    demoAuthViewModel: AuthViewModel
 ) {
     var civilId by remember { mutableStateOf("") }
     var pin by remember { mutableStateOf("") }
@@ -172,15 +180,73 @@ private fun CivilIdRegisterContent(
         Spacer(modifier = Modifier.height(16.dp))
 
         Text("Not on the roster yet, or just exploring?", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(modifier = Modifier.height(8.dp))
-        OutlinedButton(
-            onClick = onContinueInDemoMode,
-            modifier = Modifier.fillMaxWidth().height(48.dp),
-            shape = RoundedCornerShape(50)
-        ) {
-            Text("Continue in Demo Mode", fontWeight = FontWeight.Bold)
-        }
+        Spacer(modifier = Modifier.height(12.dp))
+        QuickDemoAccessSection(demoAuthViewModel)
         Spacer(modifier = Modifier.height(30.dp))
+    }
+}
+
+@Composable
+private fun QuickDemoAccessSection(demoAuthViewModel: AuthViewModel) {
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                "QUICK DEMO ACCESS",
+                color = MaterialTheme.colorScheme.primary,
+                fontSize = 10.5.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            DemoAccountRow(
+                icon = Icons.Default.Shield, name = "Artify Staff Admin", role = "Supervisor Admin",
+                color = MaterialTheme.colorScheme.primary,
+                onClick = { demoAuthViewModel.quickLoginAsEmail("artifystaff@gmail.com") }
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            DemoAccountRow(
+                icon = Icons.Default.Engineering, name = "Ahmed Ali Al-Balushi", role = "Worker",
+                color = MaterialTheme.colorScheme.secondary,
+                onClick = { demoAuthViewModel.quickLoginAs(UserRole.WORKER) }
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            DemoAccountRow(
+                icon = Icons.Default.Work, name = "Fatima Al-Harthy", role = "Staff",
+                color = MaterialTheme.colorScheme.tertiary,
+                onClick = { demoAuthViewModel.quickLoginAs(UserRole.STAFF) }
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            DemoAccountRow(
+                icon = Icons.Default.AdminPanelSettings, name = "Tariq Al-Said", role = "Supervisor",
+                color = MaterialTheme.colorScheme.error,
+                onClick = { demoAuthViewModel.quickLoginAs(UserRole.SUPERVISOR) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun DemoAccountRow(icon: ImageVector, name: String, role: String, color: androidx.compose.ui.graphics.Color, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surface,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier.size(36.dp).clip(CircleShape).background(color.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center
+            ) { Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(18.dp)) }
+            Spacer(modifier = Modifier.width(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(name, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold)
+                Text(role, fontSize = 10.5.sp, color = color)
+            }
+            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
 

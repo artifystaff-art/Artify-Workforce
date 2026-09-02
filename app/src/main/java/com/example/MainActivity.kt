@@ -9,7 +9,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.Crossfade
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
@@ -29,7 +29,6 @@ import com.example.model.UserRole
 import com.example.notifications.FcmNotificationManager
 import com.example.security.SecureSessionStore
 import com.example.ui.components.DemoModeBanner
-import com.example.ui.screens.AuthScreen
 import com.example.ui.screens.RealAuthEntryScreen
 import com.example.ui.screens.RealSupervisorDashboardScreen
 import com.example.ui.screens.RealWorkerDashboardScreen
@@ -91,15 +90,21 @@ fun ArtifyAppRoot() {
     val context = LocalContext.current
 
     // Real Civil-ID-then-PIN flow against the Artify Central Backend. This is
-    // the default entry point; Demo Mode is an explicit opt-in from within it.
+    // the single entry point: first-time devices see Civil ID registration,
+    // returning devices see PIN login, and a "Quick Demo Access" section at
+    // the bottom of the registration screen drops straight into Demo Mode.
     val realAuthRepository = remember { BackendAuthRepository(SecureSessionStore.getInstance(context)) }
     val realAuthViewModel = remember { RealAuthViewModel(realAuthRepository) }
     val realAuthState by realAuthViewModel.uiState.collectAsState()
-    var demoModeEntered by remember { mutableStateOf(false) }
 
-    if (!demoModeEntered) {
-        val signedInEmployee = realAuthState.signedInEmployee
-        if (realAuthState.screen == RealAuthScreenState.SIGNED_IN && signedInEmployee != null) {
+    val demoDb = remember { AppDatabase.getInstance(context) }
+    val demoRepository = remember { WorkforceRepository(demoDb, context.applicationContext) }
+    val demoAuthViewModel = remember { AuthViewModel(demoRepository) }
+    val demoAuthState by demoAuthViewModel.uiState.collectAsState()
+
+    val signedInEmployee = realAuthState.signedInEmployee
+    when {
+        realAuthState.screen == RealAuthScreenState.SIGNED_IN && signedInEmployee != null -> {
             val backendWorkforceRepository = remember(signedInEmployee.id) {
                 BackendWorkforceRepository(realAuthRepository, SecureSessionStore.getInstance(context))
             }
@@ -127,37 +132,28 @@ fun ArtifyAppRoot() {
                     onLogout = { realAuthViewModel.logout() }
                 )
             }
-        } else {
+        }
+        demoAuthState.currentUser != null -> {
+            ArtifyDemoModeRoot(repository = demoRepository, authViewModel = demoAuthViewModel, user = demoAuthState.currentUser!!)
+        }
+        else -> {
             RealAuthEntryScreen(
                 realAuthViewModel = realAuthViewModel,
-                onContinueInDemoMode = { demoModeEntered = true },
+                demoAuthViewModel = demoAuthViewModel,
                 onSignedIn = {}
             )
         }
-        return
     }
-
-    ArtifyDemoModeRoot()
 }
 
 @Composable
-private fun ArtifyDemoModeRoot() {
+private fun ArtifyDemoModeRoot(repository: WorkforceRepository, authViewModel: AuthViewModel, user: com.example.data.entity.UserEntity) {
     val context = LocalContext.current
-    val db = remember { AppDatabase.getInstance(context) }
-    val repository = remember { WorkforceRepository(db, context.applicationContext) }
     val locationHelper = remember { LocationHelper(context) }
     val coroutineScope = rememberCoroutineScope()
 
-    val authViewModel = remember { AuthViewModel(repository) }
-    val authState by authViewModel.uiState.collectAsState()
-
-    var projects by remember { mutableStateOf<List<com.example.data.entity.ProjectEntity>>(emptyList()) }
-
     LaunchedEffect(Unit) {
         repository.seedInitialDataIfEmpty()
-        repository.getAllProjects().collect {
-            projects = it
-        }
     }
 
     // Dynamic Permission Launcher for Location, Camera, and Notifications
@@ -189,24 +185,14 @@ private fun ArtifyDemoModeRoot() {
         permissionLauncher.launch(permissionsToRequest.toTypedArray())
     }
 
-    val currentUser = authState.currentUser
-
     // Register FCM notifications for authenticated user
-    LaunchedEffect(currentUser?.userId) {
-        currentUser?.let { user ->
-            FcmNotificationManager.registerUserForPushNotifications(context, user)
-        }
+    LaunchedEffect(user.userId) {
+        FcmNotificationManager.registerUserForPushNotifications(context, user)
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-    DemoModeBanner()
-    Crossfade(targetState = currentUser, label = "auth_screen_crossfade", modifier = Modifier.weight(1f)) { user ->
-        if (user == null) {
-            AuthScreen(
-                authViewModel = authViewModel,
-                projects = projects
-            )
-        } else {
+        DemoModeBanner()
+        Box(modifier = Modifier.weight(1f)) {
             when (user.role) {
                 UserRole.SUPERVISOR.name -> {
                     val supervisorViewModel = remember(user.userId) {
@@ -244,6 +230,5 @@ private fun ArtifyDemoModeRoot() {
                 }
             }
         }
-    }
     }
 }
