@@ -168,15 +168,14 @@ private fun ShiftTab(uiState: RealWorkerUiState, viewModel: RealWorkerViewModel,
     val active = uiState.activeShift
     val isQueuedLocally = active?.id?.startsWith(com.example.ui.viewmodel.LOCAL_PENDING_SHIFT_PREFIX) == true
 
-    LaunchedEffect(Unit) { viewModel.refreshLocationStatus() }
-
+    // NOTE: Geofence/GPS compliance status is intentionally never shown to the worker on this
+    // screen — it is recorded silently on the attendance record for supervisor/HCM review only,
+    // and must never discourage or forewarn the worker before they clock in or out.
     Column(
         modifier = Modifier.fillMaxSize().padding(20.dp).verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         SyncQueueBanner(uiState.syncQueue, onSyncNow = { viewModel.syncNow() })
-        Spacer(modifier = Modifier.height(12.dp))
-        LocationStatusCard(uiState = uiState, onRefresh = { viewModel.refreshLocationStatus() })
         Spacer(modifier = Modifier.height(16.dp))
         Surface(
             onClick = { if (active != null) viewModel.setEndShiftDialog(true) else viewModel.setStartShiftDialog(true) },
@@ -208,7 +207,6 @@ private fun ShiftTab(uiState: RealWorkerUiState, viewModel: RealWorkerViewModel,
                         if (isQueuedLocally) "Captured offline — will sync automatically." else "Started: ${active.clockIn?.serverTimestamp ?: "—"}",
                         fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    if (!isQueuedLocally) ComplianceRow(active.clockIn?.geofenceStatus, active.clockIn?.distanceFromProjectMeters)
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))
@@ -232,68 +230,6 @@ private fun ShiftTab(uiState: RealWorkerUiState, viewModel: RealWorkerViewModel,
             uiState.shiftHistory.take(5).forEach { shift -> ShiftHistoryCard(shift) }
         }
     }
-}
-
-/** Advisory GPS preview shown to the worker — never a gate. Real compliance evaluation always happens server-side at clock-in/out. */
-@Composable
-private fun LocationStatusCard(uiState: RealWorkerUiState, onRefresh: () -> Unit) {
-    val profile = uiState.profile
-    val location = uiState.locationStatus
-    val siteName = profile?.projectName ?: "Assigned Site"
-
-    val distanceMeters: Double? = if (location != null && profile?.projectLatitude != null && profile.projectLongitude != null) {
-        haversineMetersClientPreview(location.latitude, location.longitude, profile.projectLatitude, profile.projectLongitude)
-    } else null
-
-    val radius = profile?.geofenceRadiusMeters
-    val (badgeText, badgeColor) = when {
-        uiState.isLocationLoading -> "LOCATING…" to MaterialTheme.colorScheme.onSurfaceVariant
-        location == null -> "GPS UNAVAILABLE" to MaterialTheme.colorScheme.error
-        location.isMock -> "MOCK LOCATION" to MaterialTheme.colorScheme.error
-        distanceMeters != null && radius != null && distanceMeters <= radius -> "ON SITE" to MaterialTheme.colorScheme.tertiary
-        distanceMeters != null && radius != null -> "OUTSIDE RADIUS" to MaterialTheme.colorScheme.error
-        else -> "LOCATION UNKNOWN" to MaterialTheme.colorScheme.onSurfaceVariant
-    }
-
-    Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.MyLocation, contentDescription = null, tint = badgeColor, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(siteName, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold)
-                }
-                IconButton(onClick = onRefresh, modifier = Modifier.size(28.dp)) {
-                    if (uiState.isLocationLoading) CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                    else Icon(Icons.Default.Refresh, contentDescription = "Refresh GPS", modifier = Modifier.size(18.dp))
-                }
-            }
-            Spacer(modifier = Modifier.height(6.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    distanceMeters?.let { "${it.toInt()} m from site" } ?: "Distance unknown",
-                    fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Surface(shape = RoundedCornerShape(50), color = badgeColor.copy(alpha = 0.15f)) {
-                    Text(badgeText, fontSize = 9.5.sp, fontWeight = FontWeight.Bold, color = badgeColor, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
-                }
-            }
-            Text(
-                "Preview only — actual compliance is verified by the server at clock-in/out and never blocks attendance.",
-                fontSize = 9.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp)
-            )
-        }
-    }
-}
-
-private fun haversineMetersClientPreview(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
-    val r = 6371000.0
-    val dLat = Math.toRadians(lat2 - lat1)
-    val dLon = Math.toRadians(lon2 - lon1)
-    val a = Math.sin(dLat / 2).let { it * it } +
-        Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) * Math.sin(dLon / 2).let { it * it }
-    val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-    return r * c
 }
 
 @Composable
@@ -322,17 +258,6 @@ private fun ShiftHistoryCard(shift: AttendanceShiftDto) {
             }
             shift.reviewComment?.let { Text("Supervisor: $it", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
-    }
-}
-
-@Composable
-private fun ComplianceRow(status: String?, distanceMeters: Double?) {
-    if (status == null || status == "INSIDE_GEOFENCE") return
-    Surface(shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.errorContainer, modifier = Modifier.padding(top = 6.dp)) {
-        Text(
-            "Flagged: ${status.replace('_', ' ')}${distanceMeters?.let { " (${it.toInt()}m)" } ?: ""}",
-            fontSize = 11.sp, color = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.padding(6.dp)
-        )
     }
 }
 

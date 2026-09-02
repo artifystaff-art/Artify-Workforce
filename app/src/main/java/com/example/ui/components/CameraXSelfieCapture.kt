@@ -48,8 +48,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
+import androidx.exifinterface.media.ExifInterface
 import com.example.model.ShiftEventType
-import com.example.server.ServerAuthorityEngine
 import com.example.ui.theme.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -110,7 +110,6 @@ fun CameraXSelfieCaptureView(
     var capturedBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var isCameraError by remember { mutableStateOf(false) }
 
-    val serverTime = remember { ServerAuthorityEngine.getServerTimestamp() }
     val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
 
     DisposableEffect(Unit) {
@@ -193,22 +192,10 @@ fun CameraXSelfieCaptureView(
                 object : ImageCapture.OnImageSavedCallback {
                     override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
                         try {
-                            val originalBitmap = BitmapFactory.decodeFile(photoFile.absolutePath)
-                            val rotatedBitmap = if (cameraSelector == CameraSelector.DEFAULT_FRONT_CAMERA) {
-                                val matrix = Matrix()
-                                matrix.preScale(-1f, 1f)
-                                Bitmap.createBitmap(
-                                    originalBitmap,
-                                    0,
-                                    0,
-                                    originalBitmap.width,
-                                    originalBitmap.height,
-                                    matrix,
-                                    true
-                                )
-                            } else {
-                                originalBitmap
-                            }
+                            val rotatedBitmap = decodeUprightBitmap(
+                                file = photoFile,
+                                mirror = cameraSelector == CameraSelector.DEFAULT_FRONT_CAMERA
+                            )
 
                             FileOutputStream(photoFile).use { out ->
                                 rotatedBitmap.compress(Bitmap.CompressFormat.JPEG, 92, out)
@@ -269,7 +256,8 @@ fun CameraXSelfieCaptureView(
                 .padding(horizontal = 16.dp, vertical = 14.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // ==================== TOP NAVIGATION & HUD BAR ====================
+            // ==================== TOP NAVIGATION & HUD BAR (live camera only) ====================
+            if (capturedBitmap == null) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -361,6 +349,7 @@ fun CameraXSelfieCaptureView(
                     }
                 }
             }
+            }
 
             Spacer(modifier = Modifier.height(10.dp))
 
@@ -386,73 +375,6 @@ fun CameraXSelfieCaptureView(
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
                     )
-
-                    // Biometric Verification Stamp Overlay at Bottom
-                    Surface(
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .fillMaxWidth(),
-                        color = Color.Black.copy(alpha = 0.88f)
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        Icons.Default.Verified,
-                                        contentDescription = null,
-                                        tint = if (isDark) SophisticatedSuccess else SophisticatedLightSuccess,
-                                        modifier = Modifier.size(15.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = "BIOMETRIC PHOTO VERIFIED",
-                                        color = if (isDark) SophisticatedSuccess else SophisticatedLightSuccess,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        letterSpacing = 0.5.sp
-                                    )
-                                }
-                                Surface(
-                                    shape = RoundedCornerShape(50),
-                                    color = Color(0xFF1E3A8A).copy(alpha = 0.6f)
-                                ) {
-                                    Text(
-                                        text = "PAYROLL READY",
-                                        color = Color(0xFF93C5FD),
-                                        fontSize = 9.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                                    )
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(4.dp))
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(
-                                    text = "Site: $projectName",
-                                    color = Color.White,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
-                                Text(
-                                    text = serverTime.displayFormatted,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        }
-                    }
                 } else if (hasCameraPermission && !isCameraError) {
                     // ================= LIVE CAMERAX PREVIEW =================
                     AndroidView(
@@ -817,7 +739,7 @@ fun CameraXSelfieCaptureView(
                         Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = if (eventType == ShiftEventType.START_SHIFT) "Confirm & Clock In" else "Confirm & Clock Out",
+                            text = if (eventType == ShiftEventType.START_SHIFT) "Confirm & Start" else "Confirm & Clock Out",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -887,6 +809,36 @@ private fun BiometricHudCorners(modifier: Modifier = Modifier) {
         drawLine(primaryColor, Offset(size.width, size.height), Offset(size.width - bracketLen, size.height), strokeWidth = strokeW)
         drawLine(primaryColor, Offset(size.width, size.height), Offset(size.width, size.height - bracketLen), strokeWidth = strokeW)
     }
+}
+
+/**
+ * Decodes a captured JPEG applying its EXIF orientation tag (CameraX/the sensor writes rotation
+ * as metadata rather than physically rotating pixels, so a plain BitmapFactory.decodeFile comes
+ * out sideways) and, for the front camera, mirrors it horizontally for the expected selfie look.
+ */
+private fun decodeUprightBitmap(file: File, mirror: Boolean): Bitmap {
+    val original = BitmapFactory.decodeFile(file.absolutePath)
+    val orientation = try {
+        ExifInterface(file.absolutePath).getAttributeInt(
+            ExifInterface.TAG_ORIENTATION,
+            ExifInterface.ORIENTATION_NORMAL
+        )
+    } catch (e: Exception) {
+        ExifInterface.ORIENTATION_NORMAL
+    }
+    val rotationDegrees = when (orientation) {
+        ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+        ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+        ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+        else -> 0f
+    }
+
+    if (rotationDegrees == 0f && !mirror) return original
+
+    val matrix = Matrix()
+    if (rotationDegrees != 0f) matrix.postRotate(rotationDegrees)
+    if (mirror) matrix.postScale(-1f, 1f)
+    return Bitmap.createBitmap(original, 0, 0, original.width, original.height, matrix, true)
 }
 
 /**

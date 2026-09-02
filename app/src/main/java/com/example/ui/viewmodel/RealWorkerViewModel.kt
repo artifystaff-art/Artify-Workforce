@@ -6,7 +6,6 @@ import com.example.data.repository.BackendResult
 import com.example.data.repository.BackendWorkforceRepository
 import com.example.data.sync.RealSyncManager
 import com.example.data.sync.SyncQueueStatus
-import com.example.location.DeviceLocationSnapshot
 import com.example.location.LocationHelper
 import com.example.network.AttendanceEventSummary
 import com.example.network.AttendanceShiftDto
@@ -37,9 +36,7 @@ data class RealWorkerUiState(
     val syncQueue: SyncQueueStatus = SyncQueueStatus(),
     val notifications: List<NotificationDto> = emptyList(),
     val profile: ProfileDto? = null,
-    val selfieUrlCache: Map<String, String> = emptyMap(),
-    val locationStatus: DeviceLocationSnapshot? = null,
-    val isLocationLoading: Boolean = false
+    val selfieUrlCache: Map<String, String> = emptyMap()
 )
 
 /** Drives the real (backend-authenticated) worker attendance/leave flow, with offline queueing. */
@@ -111,15 +108,6 @@ class RealWorkerViewModel(
         }
     }
 
-    /** Advisory-only: shows the worker their live GPS status. Never gates clock-in/out — the server remains authoritative. */
-    fun refreshLocationStatus() {
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLocationLoading = true)
-            val location = locationHelper.getCurrentLocation()
-            _uiState.value = _uiState.value.copy(locationStatus = location, isLocationLoading = false)
-        }
-    }
-
     fun setStartShiftDialog(show: Boolean) { _uiState.value = _uiState.value.copy(showStartShiftDialog = show) }
     fun setEndShiftDialog(show: Boolean) { _uiState.value = _uiState.value.copy(showEndShiftDialog = show) }
     fun clearFeedback() { _uiState.value = _uiState.value.copy(statusMessage = null, errorMessage = null) }
@@ -155,7 +143,7 @@ class RealWorkerViewModel(
                 is BackendResult.Success -> {
                     _uiState.value = _uiState.value.copy(
                         isProcessing = false, activeShift = result.value.shift,
-                        statusMessage = complianceMessage("Shift started", result.value.geofenceStatus, result.value.distanceMeters)
+                        statusMessage = "Shift started."
                     )
                 }
                 is BackendResult.Failure -> {
@@ -192,7 +180,7 @@ class RealWorkerViewModel(
                 is BackendResult.Success -> {
                     _uiState.value = _uiState.value.copy(
                         isProcessing = false, activeShift = null,
-                        statusMessage = complianceMessage("Shift ended — submitted for approval", result.value.geofenceStatus, result.value.distanceMeters)
+                        statusMessage = "Shift ended — submitted for supervisor approval."
                     )
                     refresh()
                 }
@@ -238,18 +226,6 @@ class RealWorkerViewModel(
         clockInEventId = clientEventId, status = "OPEN", complianceFlag = "COMPLIANT",
         clockIn = AttendanceEventSummary(serverTimestamp = null, geofenceStatus = null, distanceFromProjectMeters = null)
     )
-
-    /** The clock-in/out result is never blocked by compliance, but the worker should still see the flag. */
-    private fun complianceMessage(prefix: String, geofenceStatus: String?, distanceMeters: Double?): String {
-        return when (geofenceStatus) {
-            "INSIDE_GEOFENCE", null -> "$prefix — on-site, compliant."
-            "OUTSIDE_GEOFENCE" -> "$prefix — flagged: outside site radius (${distanceMeters?.toInt() ?: "?"}m away)."
-            "MOCK_LOCATION_DETECTED" -> "$prefix — flagged: mock/spoofed location detected."
-            "ACCURACY_TOO_LOW" -> "$prefix — flagged: GPS accuracy too low."
-            "GPS_UNAVAILABLE" -> "$prefix — flagged: GPS was unavailable."
-            else -> "$prefix — flagged for review."
-        }
-    }
 
     private fun encodeSelfie(filePath: String): String? {
         return try {

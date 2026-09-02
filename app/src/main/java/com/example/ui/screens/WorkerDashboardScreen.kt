@@ -329,7 +329,6 @@ private fun ShiftDashboardTab(
 ) {
     val uiState by workerViewModel.uiState.collectAsState()
     val isShiftActive = uiState.activeShift != null
-    val isInsideGeofence = uiState.currentGeofenceResult?.isInside == true
 
     // Infinite breathing pulse for the circular camera button ring
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
@@ -352,54 +351,9 @@ private fun ShiftDashboardTab(
     ) {
         Spacer(modifier = Modifier.height(20.dp))
 
-        // --- GEOFENCE RESTRICTION WARNING BANNER (When Outside Work Site) ---
-        if (!isShiftActive && !isInsideGeofence) {
-            val currentDist = uiState.currentGeofenceResult?.distanceMeters?.toInt() ?: -1
-            val maxRadius = uiState.assignedProject?.geofenceRadiusMeters?.toInt() ?: 100
-            val siteName = uiState.assignedProject?.projectName ?: "Assigned Work Site"
-
-            Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = SophisticatedErrorContainer,
-                border = BorderStroke(1.dp, SophisticatedError.copy(alpha = 0.5f)),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 12.dp)
-                    .testTag("geofence_restriction_banner")
-            ) {
-                Row(
-                    modifier = Modifier.padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.LocationOff,
-                        contentDescription = "Outside Geofence",
-                        tint = SophisticatedError,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Outside Site Radius — Will Be Flagged",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp,
-                            color = SophisticatedError
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = if (uiState.isMockLocation) {
-                                "Mock GPS detected. You can still clock in — this will be flagged for supervisor review."
-                            } else {
-                                "Current distance: ${currentDist}m from $siteName (allowed radius: ${maxRadius}m). You can still clock in — this will be flagged for supervisor review."
-                            },
-                            fontSize = 11.sp,
-                            color = SophisticatedTextPrimary,
-                            lineHeight = 15.sp
-                        )
-                    }
-                }
-            }
-        }
+        // NOTE: Geofence/GPS status is intentionally never shown to the worker here — it is
+        // a compliance signal captured on the attendance record for supervisor/HCM review only,
+        // and must never discourage or forewarn the worker before they clock in or out.
 
         // --- ROUND BIG CAMERA SHIFT BUTTON IN A CIRCLE ---
         Box(
@@ -529,9 +483,7 @@ private fun ShiftDashboardTab(
 
                     // Secondary helper text
                     Text(
-                        text = if (isShiftActive) "Tap to Clock Out (Instant)"
-                        else if (!isInsideGeofence) "Outside Radius • Will Flag"
-                        else "Tap to Clock In",
+                        text = if (isShiftActive) "Tap to Clock Out (Instant)" else "Tap to Clock In",
                         color = if (isShiftActive) SophisticatedError else SophisticatedSuccess,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.SemiBold,
@@ -541,131 +493,9 @@ private fun ShiftDashboardTab(
             }
         }
 
-        Spacer(modifier = Modifier.height(14.dp))
-
-        // --- GEOFENCE STATUS & GOOGLE LOCATION SERVICES CARD ---
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag("geofence_status_card"),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = SophisticatedDarkSurface
-            ),
-            border = BorderStroke(
-                1.dp,
-                if (isInsideGeofence) SophisticatedSuccess.copy(alpha = 0.4f) else SophisticatedError.copy(alpha = 0.4f)
-            )
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = if (isInsideGeofence) Icons.Default.GpsFixed else Icons.Default.GpsOff,
-                            contentDescription = "Geofence Check",
-                            tint = if (isInsideGeofence) SophisticatedSuccess else SophisticatedError,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Geofence Verification",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp,
-                            color = SophisticatedTextPrimary
-                        )
-                    }
-
-                    // Status Pill
-                    Surface(
-                        shape = RoundedCornerShape(50),
-                        color = if (isInsideGeofence) SophisticatedSuccessContainer else SophisticatedErrorContainer,
-                        border = BorderStroke(
-                            1.dp,
-                            if (isInsideGeofence) SophisticatedSuccess.copy(alpha = 0.6f) else SophisticatedError.copy(alpha = 0.6f)
-                        )
-                    ) {
-                        Text(
-                            text = if (isInsideGeofence) "ON-SITE • COMPLIANT" else "OUTSIDE • WILL FLAG",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isInsideGeofence) SophisticatedSuccess else SophisticatedError,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                val currentDist = uiState.currentGeofenceResult?.distanceMeters?.toInt() ?: -1
-                val maxRadius = uiState.assignedProject?.geofenceRadiusMeters?.toInt() ?: 100
-                val siteName = uiState.assignedProject?.projectName ?: "Assigned Work Site"
-
-                Text(
-                    text = if (isInsideGeofence) {
-                        "✓ Verified within work site radius ($currentDist m from $siteName center, limit: $maxRadius m)."
-                    } else if (uiState.isMockLocation) {
-                        "⚠️ Spoofed/Mock GPS coordinates detected. Clock-ins are still accepted and flagged for supervisor review."
-                    } else {
-                        "⚠️ Outside work site perimeter ($currentDist m away, limit: $maxRadius m). Clock-ins are still accepted and flagged for supervisor review."
-                    },
-                    fontSize = 11.sp,
-                    color = if (isInsideGeofence) SophisticatedTextSecondary else SophisticatedError,
-                    lineHeight = 15.sp
-                )
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Action row for Location Services refresh and test picker
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    if (locationHelper != null) {
-                        OutlinedButton(
-                            onClick = { workerViewModel.refreshLiveLocation(locationHelper) },
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(36.dp)
-                                .testTag("refresh_gps_btn"),
-                            shape = RoundedCornerShape(10.dp),
-                            border = BorderStroke(1.dp, SophisticatedPrimary.copy(alpha = 0.5f)),
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                containerColor = SophisticatedDarkBg,
-                                contentColor = SophisticatedPrimary
-                            )
-                        ) {
-                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Refresh GPS", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-
-                    OutlinedButton(
-                        onClick = onOpenScenarioPicker,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(36.dp)
-                            .testTag("test_scenario_btn"),
-                        shape = RoundedCornerShape(10.dp),
-                        border = BorderStroke(1.dp, SophisticatedDarkBorderLight),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            containerColor = SophisticatedDarkBg,
-                            contentColor = SophisticatedTextSecondary
-                        )
-                    ) {
-                        Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(14.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Test GPS Mode", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(14.dp))
+        // NOTE: The geofence/GPS status card and its Refresh GPS / Test GPS Mode controls were
+        // intentionally removed from this worker-facing screen — compliance status is recorded
+        // silently on the attendance record and surfaced only in the supervisor/HCM review views.
 
         // --- CLOCK COUNTER OF SHIFT ---
         Card(
