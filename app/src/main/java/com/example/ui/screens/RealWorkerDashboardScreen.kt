@@ -7,6 +7,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -201,7 +202,7 @@ private fun ShiftTab(uiState: RealWorkerUiState, viewModel: RealWorkerViewModel,
                         if (isQueuedLocally) StatusPill("QUEUED")
                     }
                     Text(
-                        if (isQueuedLocally) "Captured offline — will sync automatically." else "Started: ${active.clockIn?.serverTimestamp ?: "—"}",
+                        if (isQueuedLocally) "Captured offline — will sync automatically." else "Started: ${formatShiftTime(active.clockIn?.serverTimestamp) ?: "—"}",
                         fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -250,9 +251,6 @@ private fun ShiftHistoryCard(shift: AttendanceShiftDto) {
                 ShiftStatusBadge(shift.status)
             }
             Text("Worked: ${shift.totalWorkedMinutes ?: 0} mins", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            if (shift.complianceFlag != "COMPLIANT") {
-                Text("Flag: ${shift.complianceFlag.replace('_', ' ')}", fontSize = 11.sp, color = MaterialTheme.colorScheme.error)
-            }
             shift.reviewComment?.let { Text("Supervisor: $it", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
     }
@@ -294,6 +292,19 @@ private fun ShiftStatusBadge(status: String) {
 }
 
 private data class Tuple4<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
+
+/** Formats a backend ISO-8601 timestamp (any offset) as a local HH:mm:ss clock time. */
+private fun formatShiftTime(iso: String?): String? {
+    if (iso.isNullOrBlank()) return null
+    return try {
+        val instant = java.time.OffsetDateTime.parse(iso).toInstant()
+        java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss")
+            .withZone(java.time.ZoneId.systemDefault())
+            .format(instant)
+    } catch (e: Exception) {
+        null
+    }
+}
 
 @Composable
 private fun MiniStatCard(title: String, value: String, subtext: String, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier = Modifier) {
@@ -345,7 +356,7 @@ private fun DailyLogsTab(uiState: RealWorkerUiState, viewModel: RealWorkerViewMo
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) }, singleLine = true
         )
         Spacer(modifier = Modifier.height(8.dp))
-        Row(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             listOf("ALL", "OPEN", "PENDING_REVIEW", "APPROVED", "REJECTED").forEach { f ->
                 FilterChip(selected = filter == f, onClick = { filter = f }, label = { Text(f.replace('_', ' '), fontSize = 10.sp) })
             }
@@ -382,7 +393,7 @@ private fun DailyLogsTab(uiState: RealWorkerUiState, viewModel: RealWorkerViewMo
                                             Spacer(modifier = Modifier.width(3.dp))
                                             Text("START", fontSize = 8.5.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                         }
-                                        Text(shift.clockIn?.serverTimestamp?.takeLast(8) ?: "—", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                        Text(formatShiftTime(shift.clockIn?.serverTimestamp) ?: "—", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                                     }
                                     Box(modifier = Modifier.width(1.dp).height(26.dp).background(MaterialTheme.colorScheme.outlineVariant))
                                     Column(modifier = Modifier.weight(1f).padding(start = 10.dp)) {
@@ -391,7 +402,7 @@ private fun DailyLogsTab(uiState: RealWorkerUiState, viewModel: RealWorkerViewMo
                                             Spacer(modifier = Modifier.width(3.dp))
                                             Text("END", fontSize = 8.5.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                         }
-                                        Text(shift.clockOut?.serverTimestamp?.takeLast(8) ?: "In progress", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                        Text(formatShiftTime(shift.clockOut?.serverTimestamp) ?: "In progress", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                                     }
                                     Box(modifier = Modifier.width(1.dp).height(26.dp).background(MaterialTheme.colorScheme.outlineVariant))
                                     Column(modifier = Modifier.weight(1f).padding(start = 10.dp), horizontalAlignment = Alignment.End) {
@@ -440,10 +451,9 @@ private fun AttendanceDetailDialog(shift: AttendanceShiftDto, uiState: RealWorke
 
                 KeyValueRow("Date", shift.shiftDate)
                 KeyValueRow("Site", shift.project?.name ?: "—")
-                KeyValueRow("Clock In", shift.clockIn?.serverTimestamp ?: "—")
-                KeyValueRow("Clock Out", shift.clockOut?.serverTimestamp ?: "In progress")
+                KeyValueRow("Clock In", formatShiftTime(shift.clockIn?.serverTimestamp) ?: "—")
+                KeyValueRow("Clock Out", formatShiftTime(shift.clockOut?.serverTimestamp) ?: "In progress")
                 KeyValueRow("Duration", "${shift.totalWorkedMinutes ?: 0} minutes")
-                KeyValueRow("Compliance", shift.complianceFlag.replace('_', ' '))
                 KeyValueRow("Biometric Match", if (selfiePath != null) "Selfie captured & verified" else "No selfie on record")
                 KeyValueRow("Hardware Device", (shift.clockIn?.deviceId ?: shift.clockOut?.deviceId)?.take(18) ?: "Unknown")
                 shift.reviewComment?.let { KeyValueRow("Supervisor Note", it) }
@@ -595,7 +605,7 @@ private fun LeaveForm(isSubmitting: Boolean, onCancel: () -> Unit, onSubmit: (ty
         Spacer(modifier = Modifier.height(16.dp))
         Text("REASON", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(modifier = Modifier.height(6.dp))
-        Row(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             (suggestedReasons[type] ?: emptyList()).forEach { suggestion ->
                 AssistChip(onClick = { reason = suggestion }, label = { Text(suggestion, fontSize = 10.sp) })
             }

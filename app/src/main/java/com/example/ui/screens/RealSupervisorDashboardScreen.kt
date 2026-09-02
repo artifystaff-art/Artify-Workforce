@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -248,8 +249,8 @@ private fun InspectAttendanceDialog(
                 }
 
                 InspectRow("Shift Date", shift.shiftDate)
-                InspectRow("Clock In", shift.clockIn?.serverTimestamp ?: "—")
-                InspectRow("Clock Out", shift.clockOut?.serverTimestamp ?: "In progress")
+                InspectRow("Clock In", formatShiftTime(shift.clockIn?.serverTimestamp) ?: "—")
+                InspectRow("Clock Out", formatShiftTime(shift.clockOut?.serverTimestamp) ?: "In progress")
                 InspectRow("Duration", "${shift.totalWorkedMinutes ?: 0} minutes")
                 InspectRow("Compliance", shift.complianceFlag.replace('_', ' '))
 
@@ -269,6 +270,19 @@ private fun InspectRow(label: String, value: String) {
     Row(modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(label, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
         Text(value, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1.4f), textAlign = androidx.compose.ui.text.style.TextAlign.End)
+    }
+}
+
+/** Formats a backend ISO-8601 timestamp (any offset) as a local HH:mm:ss clock time. */
+private fun formatShiftTime(iso: String?): String? {
+    if (iso.isNullOrBlank()) return null
+    return try {
+        val instant = java.time.OffsetDateTime.parse(iso).toInstant()
+        java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss")
+            .withZone(java.time.ZoneId.systemDefault())
+            .format(instant)
+    } catch (e: Exception) {
+        null
     }
 }
 
@@ -342,7 +356,7 @@ private fun RosterTab(uiState: RealSupervisorUiState) {
         Spacer(modifier = Modifier.height(10.dp))
         OutlinedTextField(value = query, onValueChange = { query = it }, modifier = Modifier.fillMaxWidth(), placeholder = { Text("Search by name or ID…", fontSize = 12.sp) }, singleLine = true)
         Spacer(modifier = Modifier.height(8.dp))
-        Row(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             listOf("ALL", "ACTIVE", "INACTIVE", "SUSPENDED").forEach { f ->
                 FilterChip(selected = statusFilter == f, onClick = { statusFilter = f }, label = { Text(f, fontSize = 10.sp) })
             }
