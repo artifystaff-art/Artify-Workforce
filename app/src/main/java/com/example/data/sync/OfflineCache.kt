@@ -7,6 +7,7 @@ import com.example.network.NotificationDto
 import com.example.network.ProfileDto
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.Types
+import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 
 /**
  * Last-known-good snapshot of the worker's own read data (shifts, leave, profile,
@@ -16,7 +17,7 @@ import com.squareup.moshi.Types
  */
 class OfflineCache(context: Context) {
     private val dao = RealSyncDatabase.getInstance(context).cacheDao()
-    private val moshi = Moshi.Builder().build()
+    private val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
 
     private val shiftsAdapter = moshi.adapter<List<AttendanceShiftDto>>(
         Types.newParameterizedType(List::class.java, AttendanceShiftDto::class.java)
