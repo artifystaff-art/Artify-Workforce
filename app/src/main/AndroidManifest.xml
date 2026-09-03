@@ -13,6 +13,7 @@
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
 
     <application
+        android:name=".ArtifyApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -32,6 +33,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".CrashReportActivity"
+            android:exported="false"
+            android:label="Crash Report"
+            android:theme="@style/Theme.MyApplication" />
 
         <service
             android:name=".notifications.ArtifyFirebaseMessagingService"
