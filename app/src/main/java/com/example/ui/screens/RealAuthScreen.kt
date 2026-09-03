@@ -41,7 +41,7 @@ import com.example.ui.viewmodel.RealAuthViewModel
 @Composable
 fun RealAuthEntryScreen(
     realAuthViewModel: RealAuthViewModel,
-    demoAuthViewModel: AuthViewModel,
+    onRequestDemoAuthViewModel: () -> AuthViewModel,
     onSignedIn: (BackendEmployee) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -75,7 +75,7 @@ fun RealAuthEntryScreen(
                 errorMessage = uiState.errorMessage,
                 notEligible = uiState.notEligibleForRealAccount,
                 onSubmit = { civilId, pin -> realAuthViewModel.registerWithCivilId(civilId, pin) },
-                demoAuthViewModel = demoAuthViewModel
+                onRequestDemoAuthViewModel = onRequestDemoAuthViewModel
             )
         }
     }
@@ -87,7 +87,7 @@ private fun CivilIdRegisterContent(
     errorMessage: String?,
     notEligible: Boolean,
     onSubmit: (civilId: String, pin: String) -> Unit,
-    demoAuthViewModel: AuthViewModel
+    onRequestDemoAuthViewModel: () -> AuthViewModel
 ) {
     var civilId by remember { mutableStateOf("") }
     var pin by remember { mutableStateOf("") }
@@ -186,7 +186,7 @@ private fun CivilIdRegisterContent(
 
     if (showDemoPicker) {
         DemoAccountPickerDialog(
-            demoAuthViewModel = demoAuthViewModel,
+            onRequestDemoAuthViewModel = onRequestDemoAuthViewModel,
             onDismiss = { showDemoPicker = false }
         )
     }
@@ -217,7 +217,7 @@ private fun DemoModeEntryCard(onClick: () -> Unit) {
 }
 
 @Composable
-private fun DemoAccountPickerDialog(demoAuthViewModel: AuthViewModel, onDismiss: () -> Unit) {
+private fun DemoAccountPickerDialog(onRequestDemoAuthViewModel: () -> AuthViewModel, onDismiss: () -> Unit) {
     androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
         Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(20.dp)) {
@@ -232,25 +232,25 @@ private fun DemoAccountPickerDialog(demoAuthViewModel: AuthViewModel, onDismiss:
                 DemoAccountRow(
                     icon = Icons.Default.Shield, name = "Artify Staff Admin", role = "Supervisor Admin",
                     color = MaterialTheme.colorScheme.primary,
-                    onClick = { demoAuthViewModel.quickLoginAsEmail("artifystaff@gmail.com") }
+                    onClick = { onRequestDemoAuthViewModel().quickLoginAsEmail("artifystaff@gmail.com") }
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 DemoAccountRow(
                     icon = Icons.Default.Engineering, name = "Ahmed Ali Al-Balushi", role = "Worker",
                     color = MaterialTheme.colorScheme.secondary,
-                    onClick = { demoAuthViewModel.quickLoginAs(UserRole.WORKER) }
+                    onClick = { onRequestDemoAuthViewModel().quickLoginAs(UserRole.WORKER) }
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 DemoAccountRow(
                     icon = Icons.Default.Work, name = "Fatima Al-Harthy", role = "Staff",
                     color = MaterialTheme.colorScheme.tertiary,
-                    onClick = { demoAuthViewModel.quickLoginAs(UserRole.STAFF) }
+                    onClick = { onRequestDemoAuthViewModel().quickLoginAs(UserRole.STAFF) }
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 DemoAccountRow(
                     icon = Icons.Default.AdminPanelSettings, name = "Tariq Al-Said", role = "Supervisor",
                     color = MaterialTheme.colorScheme.error,
-                    onClick = { demoAuthViewModel.quickLoginAs(UserRole.SUPERVISOR) }
+                    onClick = { onRequestDemoAuthViewModel().quickLoginAs(UserRole.SUPERVISOR) }
                 )
             }
         }

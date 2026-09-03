@@ -98,10 +98,22 @@ fun ArtifyAppRoot() {
     val realAuthViewModel = remember { RealAuthViewModel(realAuthRepository) }
     val realAuthState by realAuthViewModel.uiState.collectAsState()
 
-    val demoDb = remember { AppDatabase.getInstance(context) }
-    val demoRepository = remember { WorkforceRepository(demoDb, context.applicationContext) }
-    val demoAuthViewModel = remember { AuthViewModel(demoRepository) }
-    val demoAuthState by demoAuthViewModel.uiState.collectAsState()
+    // Demo Mode's database/repository/view model are intentionally NOT created until a
+    // demo account is actually requested. Building them eagerly here would seed the local
+    // Demo database and start the Firestore sync manager on every single app launch, even
+    // for a user who only ever uses Real Mode.
+    var demoAuthViewModel by remember { mutableStateOf<AuthViewModel?>(null) }
+    var demoRepository by remember { mutableStateOf<WorkforceRepository?>(null) }
+    val ensureDemoAuthViewModel: () -> AuthViewModel = ensure@{
+        demoAuthViewModel?.let { return@ensure it }
+        val db = AppDatabase.getInstance(context)
+        val repo = WorkforceRepository(db, context.applicationContext)
+        val vm = AuthViewModel(repo)
+        demoRepository = repo
+        demoAuthViewModel = vm
+        vm
+    }
+    val demoAuthState = demoAuthViewModel?.uiState?.collectAsState()?.value
 
     val signedInEmployee = realAuthState.signedInEmployee
     when {
@@ -137,13 +149,13 @@ fun ArtifyAppRoot() {
                 )
             }
         }
-        demoAuthState.currentUser != null -> {
-            ArtifyDemoModeRoot(repository = demoRepository, authViewModel = demoAuthViewModel, user = demoAuthState.currentUser!!)
+        demoAuthState?.currentUser != null -> {
+            ArtifyDemoModeRoot(repository = demoRepository!!, authViewModel = demoAuthViewModel!!, user = demoAuthState.currentUser)
         }
         else -> {
             RealAuthEntryScreen(
                 realAuthViewModel = realAuthViewModel,
-                demoAuthViewModel = demoAuthViewModel,
+                onRequestDemoAuthViewModel = ensureDemoAuthViewModel,
                 onSignedIn = {}
             )
         }
