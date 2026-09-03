@@ -3,6 +3,6 @@
     <item
         android:width="66dp"
         android:height="66dp"
-        android:drawable="@drawable/artify_workforce_icon_1787659128817"
+        android:drawable="@drawable/artify_mark_foreground"
         android:gravity="center" />
 </layer-list>
