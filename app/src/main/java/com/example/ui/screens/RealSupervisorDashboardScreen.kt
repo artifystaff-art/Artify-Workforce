@@ -29,7 +29,7 @@ import com.example.ui.viewmodel.AiAssistantViewModel
 import com.example.ui.viewmodel.RealSupervisorUiState
 import com.example.ui.viewmodel.RealSupervisorViewModel
 
-private enum class SupTab { APPROVALS, LEAVE, SITES, ROSTER, AUDIT }
+private enum class SupTab { APPROVALS, ROSTER, LEAVE, SITES, AUDIT }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,17 +65,50 @@ fun RealSupervisorDashboardScreen(
             }
         },
         bottomBar = {
+            val navColors = @Composable {
+                NavigationBarItemDefaults.colors(
+                    selectedIconColor = MaterialTheme.colorScheme.primary,
+                    indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    selectedTextColor = MaterialTheme.colorScheme.primary
+                )
+            }
             NavigationBar {
-                NavigationBarItem(selected = tab == SupTab.APPROVALS, onClick = { tab = SupTab.APPROVALS },
-                    icon = { Icon(Icons.Default.Verified, contentDescription = "Approvals") }, label = { Text("Approvals") })
-                NavigationBarItem(selected = tab == SupTab.LEAVE, onClick = { tab = SupTab.LEAVE },
-                    icon = { Icon(Icons.Default.EventAvailable, contentDescription = "Leave") }, label = { Text("Leave") })
-                NavigationBarItem(selected = tab == SupTab.SITES, onClick = { tab = SupTab.SITES },
-                    icon = { Icon(Icons.Default.LocationCity, contentDescription = "Sites") }, label = { Text("Sites") })
-                NavigationBarItem(selected = tab == SupTab.ROSTER, onClick = { tab = SupTab.ROSTER },
-                    icon = { Icon(Icons.Default.People, contentDescription = "Roster") }, label = { Text("Roster") })
-                NavigationBarItem(selected = tab == SupTab.AUDIT, onClick = { tab = SupTab.AUDIT },
-                    icon = { Icon(Icons.Default.SyncAlt, contentDescription = "Audit & ERP") }, label = { Text("ERP") })
+                NavigationBarItem(
+                    selected = tab == SupTab.APPROVALS, onClick = { tab = SupTab.APPROVALS },
+                    icon = {
+                        BadgedBox(badge = {
+                            if (uiState.pendingAttendance.isNotEmpty()) {
+                                Badge(containerColor = MaterialTheme.colorScheme.tertiary) { Text(uiState.pendingAttendance.size.toString()) }
+                            }
+                        }) { Icon(Icons.Default.Verified, contentDescription = "Approvals") }
+                    },
+                    label = { Text("Approvals") }, colors = navColors()
+                )
+                NavigationBarItem(
+                    selected = tab == SupTab.ROSTER, onClick = { tab = SupTab.ROSTER },
+                    icon = { Icon(Icons.Default.People, contentDescription = "Roster") }, label = { Text("Roster") }, colors = navColors()
+                )
+                NavigationBarItem(
+                    selected = tab == SupTab.LEAVE, onClick = { tab = SupTab.LEAVE },
+                    icon = {
+                        BadgedBox(badge = {
+                            if (uiState.pendingLeave.isNotEmpty()) {
+                                Badge(containerColor = MaterialTheme.colorScheme.secondary) { Text(uiState.pendingLeave.size.toString()) }
+                            }
+                        }) { Icon(Icons.Default.EventAvailable, contentDescription = "Leave") }
+                    },
+                    label = { Text("Leave") }, colors = navColors()
+                )
+                NavigationBarItem(
+                    selected = tab == SupTab.SITES, onClick = { tab = SupTab.SITES },
+                    icon = { Icon(Icons.Default.LocationCity, contentDescription = "Sites") }, label = { Text("Sites") }, colors = navColors()
+                )
+                NavigationBarItem(
+                    selected = tab == SupTab.AUDIT, onClick = { tab = SupTab.AUDIT },
+                    icon = { Icon(Icons.Default.SyncAlt, contentDescription = "Audit & ERP") }, label = { Text("ERP") }, colors = navColors()
+                )
             }
         }
     ) { padding ->
@@ -146,11 +179,10 @@ fun RealSupervisorDashboardScreen(
 private fun MetricsBar(metrics: SupervisorMetricsDto) {
     Surface(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f), modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp, horizontal = 8.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
-            MetricStat("Present", metrics.present, MaterialTheme.colorScheme.primary)
-            MetricStat("Working", metrics.working, MaterialTheme.colorScheme.tertiary)
-            MetricStat("Attn. Pending", metrics.attendancePending, MaterialTheme.colorScheme.secondary)
-            MetricStat("Leave Pending", metrics.leavePending, MaterialTheme.colorScheme.secondary)
-            MetricStat("On Leave", metrics.onLeave, MaterialTheme.colorScheme.onSurfaceVariant)
+            MetricStat("Present", metrics.present, com.example.ui.theme.SophisticatedSuccess)
+            MetricStat("Working", metrics.working, MaterialTheme.colorScheme.primary)
+            MetricStat("Pending", metrics.attendancePending + metrics.leavePending, com.example.ui.theme.SophisticatedWarning)
+            MetricStat("On Leave", metrics.onLeave, MaterialTheme.colorScheme.secondary)
         }
     }
 }

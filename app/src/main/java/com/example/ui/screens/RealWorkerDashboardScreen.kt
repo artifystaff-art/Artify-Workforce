@@ -90,15 +90,24 @@ fun RealWorkerDashboardScreen(
             }
         },
         bottomBar = {
+            val navColors = @Composable {
+                NavigationBarItemDefaults.colors(
+                    selectedIconColor = MaterialTheme.colorScheme.primary,
+                    indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    selectedTextColor = MaterialTheme.colorScheme.primary
+                )
+            }
             NavigationBar {
                 NavigationBarItem(selected = tab == RealWorkerTab.SHIFT, onClick = { tab = RealWorkerTab.SHIFT },
-                    icon = { Icon(Icons.Default.Schedule, contentDescription = "Shift") }, label = { Text("Shift") })
+                    icon = { Icon(Icons.Default.Schedule, contentDescription = "Shift") }, label = { Text("Shift") }, colors = navColors())
                 NavigationBarItem(selected = tab == RealWorkerTab.LOGS, onClick = { tab = RealWorkerTab.LOGS },
-                    icon = { Icon(Icons.Default.History, contentDescription = "Daily Logs") }, label = { Text("Logs") })
+                    icon = { Icon(Icons.Default.History, contentDescription = "Daily Logs") }, label = { Text("Daily Logs") }, colors = navColors())
                 NavigationBarItem(selected = tab == RealWorkerTab.LEAVE, onClick = { tab = RealWorkerTab.LEAVE },
-                    icon = { Icon(Icons.Default.EventNote, contentDescription = "Leave") }, label = { Text("Leave") })
+                    icon = { Icon(Icons.Default.EventNote, contentDescription = "Leave") }, label = { Text("Leave") }, colors = navColors())
                 NavigationBarItem(selected = tab == RealWorkerTab.PROFILE, onClick = { tab = RealWorkerTab.PROFILE },
-                    icon = { Icon(Icons.Default.Person, contentDescription = "Profile") }, label = { Text("Profile") })
+                    icon = { Icon(Icons.Default.Person, contentDescription = "Profile") }, label = { Text("Profile") }, colors = navColors())
             }
         }
     ) { padding ->
