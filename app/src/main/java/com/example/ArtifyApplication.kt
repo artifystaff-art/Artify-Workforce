@@ -1,16 +1,16 @@
 package com.example
 
 import android.app.Application
-import android.content.Intent
-import android.os.Process
-import kotlin.system.exitProcess
+import java.io.File
 
 /**
  * Installs a process-wide crash handler for internal testing builds. Sideloaded debug APKs
- * have no Play Console crash reporting, and the OEM's own "app has stopped" dialog on many
- * devices shows only a generic message with no technical detail — leaving testers unable to
- * report anything actionable. This catches the crash before the OS does, launches
- * CrashReportActivity with the full exception, then terminates the process cleanly.
+ * have no Play Console crash reporting, and the OEM's own crash dialog on many devices shows
+ * only a generic message with no technical detail. Starting a new Activity from inside an
+ * uncaught-exception handler is unreliable on some OEM skins (the process may already be
+ * mid-teardown), so instead this writes the crash details to a file synchronously — which
+ * cannot fail the way starting an Activity can — then lets the platform's default handler run
+ * as normal. MainActivity checks for that file on the next launch and shows it full-screen.
  */
 class ArtifyApplication : Application() {
     override fun onCreate() {
@@ -31,18 +31,15 @@ class ArtifyApplication : Application() {
                         cause = cause.cause
                     }
                 }
-                val intent = Intent(applicationContext, CrashReportActivity::class.java).apply {
-                    putExtra(CrashReportActivity.EXTRA_DETAILS, details)
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                }
-                startActivity(intent)
-            } catch (e: Exception) {
-                // If even the crash screen fails to launch, fall through to the platform handler.
-                defaultHandler?.uncaughtException(thread, throwable)
-            } finally {
-                Process.killProcess(Process.myPid())
-                exitProcess(1)
+                File(filesDir, CRASH_FILE_NAME).writeText(details)
+            } catch (_: Throwable) {
+                // Best effort only — never let the crash reporter itself throw.
             }
+            defaultHandler?.uncaughtException(thread, throwable)
         }
+    }
+
+    companion object {
+        const val CRASH_FILE_NAME = "last_crash.txt"
     }
 }

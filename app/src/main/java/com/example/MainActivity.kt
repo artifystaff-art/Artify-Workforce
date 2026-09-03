@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import java.io.File
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -50,6 +51,22 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // If the previous run crashed, ArtifyApplication's handler wrote the details to this
+        // file before the process died. Show it now instead of the normal UI, since trying to
+        // launch a new Activity from inside the crash handler itself is unreliable on some
+        // OEM skins (the process may already be mid-teardown at that point).
+        val crashFile = File(filesDir, ArtifyApplication.CRASH_FILE_NAME)
+        if (crashFile.exists()) {
+            val details = try { crashFile.readText() } finally { crashFile.delete() }
+            startActivity(
+                android.content.Intent(this, CrashReportActivity::class.java)
+                    .putExtra(CrashReportActivity.EXTRA_DETAILS, details)
+            )
+            finish()
+            return
+        }
+
         enableEdgeToEdge()
         try {
             if (com.google.firebase.FirebaseApp.getApps(this).isEmpty()) {
